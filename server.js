@@ -14,6 +14,9 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+const projectRoutes = require('./routes/projects');
+app.use('/api/projects', projectRoutes);
+
 app.listen(PORT, () => {
   console.log(`Tasker running on http://localhost:${PORT}`);
 });
