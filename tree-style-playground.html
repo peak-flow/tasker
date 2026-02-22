@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Task Tree Style Playground</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #232733;
+    --border: #2d3140;
+    --text: #e1e4ed;
+    --text-muted: #8b90a0;
+    --accent: #6c8cff;
+    --accent-dim: #3d5199;
+    --green: #4ade80;
+    --orange: #fb923c;
+    --purple: #a78bfa;
+    --pink: #f472b6;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    min-height: 100vh;
+  }
+
+  .controls {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 20px;
+    overflow-y: auto;
+  }
+
+  .controls h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  .control-group {
+    margin-bottom: 24px;
+  }
+
+  .control-group label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .style-card {
+    padding: 12px;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .style-card:hover {
+    border-color: var(--accent-dim);
+    background: var(--surface2);
+  }
+
+  .style-card.active {
+    border-color: var(--accent);
+    background: rgba(108, 140, 255, 0.08);
+  }
+
+  .style-card h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .style-card p {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.4;
+  }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+  }
+
+  .toggle-row span {
+    font-size: 13px;
+  }
+
+  .toggle {
+    width: 40px;
+    height: 22px;
+    background: var(--border);
+    border-radius: 11px;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.2s;
+  }
+
+  .toggle.on {
+    background: var(--accent);
+  }
+
+  .toggle::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    background: white;
+    border-radius: 50%;
+    top: 3px;
+    left: 3px;
+    transition: transform 0.2s;
+  }
+
+  .toggle.on::after {
+    transform: translateX(18px);
+  }
+
+  .slider-row {
+    padding: 6px 0;
+  }
+
+  .slider-row input[type="range"] {
+    width: 100%;
+    accent-color: var(--accent);
+    margin-top: 4px;
+  }
+
+  .slider-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+  }
+
+  .main-area {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .preview-area {
+    flex: 1;
+    padding: 32px;
+    overflow: auto;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  .prompt-area {
+    border-top: 1px solid var(--border);
+    padding: 16px 24px;
+    background: var(--surface);
+  }
+
+  .prompt-area h3 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .prompt-text {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text);
+    background: var(--bg);
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    min-height: 48px;
+  }
+
+  .copy-btn {
+    margin-top: 8px;
+    padding: 6px 16px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+
+  .copy-btn:hover { opacity: 0.9; }
+
+  /* === STYLE 1: Vertical Tree === */
+  .vtree {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  .vtree-node {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .vtree-card {
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+    z-index: 1;
+  }
+
+  .vtree-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+
+  .vtree-children {
+    display: flex;
+    gap: 24px;
+    position: relative;
+    padding-top: 28px;
+  }
+
+  .vtree-children::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 0;
+    height: 14px;
+    border-left: 2px solid var(--border);
+  }
+
+  .vtree-children::after {
+    content: '';
+    position: absolute;
+    top: 14px;
+    height: 0;
+    border-top: 2px solid var(--border);
+  }
+
+  .vtree-node > .vtree-children > .vtree-node::before {
+    content: '';
+    position: absolute;
+    top: -14px;
+    left: 50%;
+    width: 0;
+    height: 14px;
+    border-left: 2px solid var(--border);
+  }
+
+  .vtree-connector {
+    width: 2px;
+    height: 24px;
+    background: var(--border);
+  }
+
+  /* === STYLE 2: Indented List === */
+  .itree {
+    font-size: 13px;
+    min-width: 320px;
+  }
+
+  .itree-item {
+    position: relative;
+  }
+
+  .itree-row {
+    display: flex;
+    align-items: center;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.1s;
+    gap: 8px;
+  }
+
+  .itree-row:hover {
+    background: var(--surface2);
+  }
+
+  .itree-chevron {
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: var(--text-muted);
+    transition: transform 0.15s;
+    flex-shrink: 0;
+  }
+
+  .itree-chevron.expanded {
+    transform: rotate(90deg);
+  }
+
+  .itree-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .itree-label {
+    font-size: 13px;
+    flex: 1;
+  }
+
+  .itree-badge {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: var(--surface2);
+    color: var(--text-muted);
+  }
+
+  .itree-children {
+    padding-left: 24px;
+    border-left: 1px solid var(--border);
+    margin-left: 19px;
+  }
+
+  .itree-ai-btn {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(108,140,255,0.15);
+    color: var(--accent);
+    border: 1px solid rgba(108,140,255,0.3);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .itree-row:hover .itree-ai-btn {
+    opacity: 1;
+  }
+
+  /* === STYLE 3: Card-based Node Graph === */
+  .cgraph {
+    position: relative;
+    min-width: 600px;
+    min-height: 500px;
+  }
+
+  .cgraph-node {
+    position: absolute;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    min-width: 140px;
+    cursor: pointer;
+    transition: all 0.15s;
+    z-index: 1;
+  }
+
+  .cgraph-node:hover {
+    transform: scale(1.03);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    z-index: 2;
+  }
+
+  .cgraph-node h4 {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .cgraph-node p {
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  .cgraph-node .node-color {
+    width: 100%;
+    height: 3px;
+    border-radius: 2px;
+    margin-bottom: 8px;
+  }
+
+  .cgraph-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  .cgraph-line {
+    stroke: var(--border);
+    stroke-width: 2;
+    fill: none;
+  }
+
+  .cgraph-ai-btn {
+    margin-top: 8px;
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: rgba(108,140,255,0.12);
+    color: var(--accent);
+    border: 1px solid rgba(108,140,255,0.25);
+    cursor: pointer;
+    display: block;
+    width: 100%;
+  }
+
+  /* Color themes for depth */
+  .depth-0 { --node-color: var(--accent); }
+  .depth-1 { --node-color: var(--green); }
+  .depth-2 { --node-color: var(--orange); }
+  .depth-3 { --node-color: var(--purple); }
+  .depth-4 { --node-color: var(--pink); }
+
+  .preset-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+
+  .preset-btn {
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .preset-btn:hover, .preset-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(108,140,255,0.08);
+  }
+
+  .section-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 16px 0;
+  }
+</style>
+</head>
+<body>
+<div class="layout" x-data="playground()">
+  <!-- Controls Panel -->
+  <div class="controls">
+    <h2>Tree Style Explorer</h2>
+
+    <div class="control-group">
+      <label>Presets</label>
+      <div class="preset-row">
+        <button class="preset-btn" :class="{'active': preset === 'default'}" @click="applyPreset('default')">Default</button>
+        <button class="preset-btn" :class="{'active': preset === 'dense'}" @click="applyPreset('dense')">Dense</button>
+        <button class="preset-btn" :class="{'active': preset === 'deep'}" @click="applyPreset('deep')">Deep Nest</button>
+        <button class="preset-btn" :class="{'active': preset === 'flat'}" @click="applyPreset('flat')">Flat</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>Visual Style</label>
+      <div class="style-card" :class="{'active': style === 'vertical'}" @click="style = 'vertical'">
+        <h3>Vertical Tree</h3>
+        <p>Org-chart style with nodes connected by lines, expands downward. Clear hierarchy.</p>
+      </div>
+      <div class="style-card" :class="{'active': style === 'indented'}" @click="style = 'indented'">
+        <h3>Indented List</h3>
+        <p>File-explorer style with connector lines. Compact, scannable, infinite depth.</p>
+      </div>
+      <div class="style-card" :class="{'active': style === 'cards'}" @click="style = 'cards'">
+        <h3>Card Node Graph</h3>
+        <p>Spatial mind-map with connected cards. Visual, but gets complex at depth.</p>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <div class="control-group">
+      <label>Options</label>
+      <div class="toggle-row">
+        <span>Show AI button</span>
+        <div class="toggle" :class="{'on': showAiBtn}" @click="showAiBtn = !showAiBtn"></div>
+      </div>
+      <div class="toggle-row">
+        <span>Color by depth</span>
+        <div class="toggle" :class="{'on': colorByDepth}" @click="colorByDepth = !colorByDepth"></div>
+      </div>
+      <div class="toggle-row">
+        <span>Show subtask count</span>
+        <div class="toggle" :class="{'on': showCount}" @click="showCount = !showCount"></div>
+      </div>
+      <div class="toggle-row">
+        <span>Animate expand</span>
+        <div class="toggle" :class="{'on': animate}" @click="animate = !animate"></div>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <div class="control-group">
+      <div class="slider-row">
+        <div class="slider-label">
+          <span>Max visible depth</span>
+          <span x-text="maxDepth"></span>
+        </div>
+        <input type="range" min="1" max="5" x-model.number="maxDepth">
+      </div>
+      <div class="slider-row">
+        <div class="slider-label">
+          <span>Node spacing</span>
+          <span x-text="spacing + 'px'"></span>
+        </div>
+        <input type="range" min="4" max="24" x-model.number="spacing">
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <div class="control-group">
+      <label style="color: var(--text-muted); font-size: 11px; line-height: 1.5;">
+        Click any node to expand/collapse. The "Break down" button simulates Gemini AI generating subtasks.
+      </label>
+    </div>
+  </div>
+
+  <!-- Main Area -->
+  <div class="main-area">
+    <div class="preview-area">
+
+      <!-- VERTICAL TREE -->
+      <template x-if="style === 'vertical'">
+        <div class="vtree" style="padding-top: 24px;">
+          <template x-for="(node, i) in tree" :key="node.id">
+            <div>
+              <div x-html="renderVerticalNode(node, 0)"></div>
+            </div>
+          </template>
+        </div>
+      </template>
+
+      <!-- INDENTED LIST -->
+      <template x-if="style === 'indented'">
+        <div class="itree" style="padding: 12px;">
+          <template x-for="node in tree" :key="node.id">
+            <div x-html="renderIndentedNode(node, 0)"></div>
+          </template>
+        </div>
+      </template>
+
+      <!-- CARD NODE GRAPH -->
+      <template x-if="style === 'cards'">
+        <div class="cgraph" x-html="renderCardGraph()" style="width: 100%;"></div>
+      </template>
+
+    </div>
+
+    <!-- Prompt Output -->
+    <div class="prompt-area">
+      <h3>Generated Prompt</h3>
+      <div class="prompt-text" x-text="generatePrompt()"></div>
+      <button class="copy-btn" @click="copyPrompt()">
+        <span x-text="copied ? 'Copied!' : 'Copy Prompt'"></span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Alpine.js CDN - inlined to avoid external deps at runtime
+</script>
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<script>
+document.addEventListener('alpine:init', () => {
+  Alpine.data('playground', () => ({
+    style: 'indented',
+    preset: 'default',
+    showAiBtn: true,
+    colorByDepth: true,
+    showCount: true,
+    animate: true,
+    maxDepth: 3,
+    spacing: 8,
+    copied: false,
+
+    tree: [
+      {
+        id: 1, label: 'Build Portfolio Website', expanded: true, children: [
+          {
+            id: 2, label: 'Design Phase', expanded: true, children: [
+              { id: 5, label: 'Create wireframes', expanded: false, children: [
+                { id: 10, label: 'Sketch homepage layout', expanded: false, children: [] },
+                { id: 11, label: 'Sketch project page', expanded: false, children: [] },
+                { id: 12, label: 'Sketch contact form', expanded: false, children: [] },
+              ]},
+              { id: 6, label: 'Choose color palette', expanded: false, children: [] },
+              { id: 7, label: 'Select typography', expanded: false, children: [] },
+            ]
+          },
+          {
+            id: 3, label: 'Development', expanded: true, children: [
+              { id: 8, label: 'Set up project structure', expanded: false, children: [
+                { id: 13, label: 'Initialize git repo', expanded: false, children: [] },
+                { id: 14, label: 'Add Alpine.js + Tailwind', expanded: false, children: [] },
+                { id: 15, label: 'Create folder structure', expanded: false, children: [] },
+              ]},
+              { id: 9, label: 'Build components', expanded: false, children: [
+                { id: 16, label: 'Navigation bar', expanded: false, children: [] },
+                { id: 17, label: 'Hero section', expanded: false, children: [] },
+                { id: 18, label: 'Project gallery', expanded: false, children: [] },
+              ]},
+            ]
+          },
+          {
+            id: 4, label: 'Launch', expanded: false, children: [
+              { id: 19, label: 'Deploy to hosting', expanded: false, children: [] },
+              { id: 20, label: 'Set up domain', expanded: false, children: [] },
+              { id: 21, label: 'Test all pages', expanded: false, children: [] },
+            ]
+          },
+        ]
+      }
+    ],
+
+    depthColors: ['#6c8cff', '#4ade80', '#fb923c', '#a78bfa', '#f472b6'],
+
+    getColor(depth) {
+      if (!this.colorByDepth) return '#6c8cff';
+      return this.depthColors[depth % this.depthColors.length];
+    },
+
+    countChildren(node) {
+      let count = node.children.length;
+      node.children.forEach(c => count += this.countChildren(c));
+      return count;
+    },
+
+    toggleNode(id) {
+      const toggle = (nodes) => {
+        for (let n of nodes) {
+          if (n.id === id) { n.expanded = !n.expanded; return true; }
+          if (toggle(n.children)) return true;
+        }
+        return false;
+      };
+      toggle(this.tree);
+    },
+
+    applyPreset(name) {
+      this.preset = name;
+      if (name === 'default') {
+        this.maxDepth = 3; this.spacing = 8; this.colorByDepth = true; this.showCount = true; this.showAiBtn = true; this.animate = true;
+      } else if (name === 'dense') {
+        this.maxDepth = 4; this.spacing = 4; this.colorByDepth = true; this.showCount = false; this.showAiBtn = false; this.animate = false;
+      } else if (name === 'deep') {
+        this.maxDepth = 5; this.spacing = 6; this.colorByDepth = true; this.showCount = true; this.showAiBtn = true; this.animate = true;
+        // expand everything
+        const expandAll = (nodes) => nodes.forEach(n => { n.expanded = true; expandAll(n.children); });
+        expandAll(this.tree);
+      } else if (name === 'flat') {
+        this.maxDepth = 1; this.spacing = 12; this.colorByDepth = false; this.showCount = true; this.showAiBtn = true; this.animate = true;
+        // collapse all children
+        const collapseAll = (nodes) => nodes.forEach(n => { n.expanded = false; collapseAll(n.children); });
+        this.tree.forEach(n => { n.expanded = true; collapseAll(n.children); });
+      }
+    },
+
+    // ====== VERTICAL TREE RENDERER ======
+    renderVerticalNode(node, depth) {
+      if (depth > this.maxDepth) return '';
+      const color = this.getColor(depth);
+      const count = this.countChildren(node);
+      const countBadge = this.showCount && count > 0 ? `<span style="font-size:10px;margin-left:6px;opacity:0.6">(${count})</span>` : '';
+      const aiBtn = this.showAiBtn && node.children.length === 0 ?
+        `<div style="text-align:center;margin-top:8px"><button style="font-size:10px;padding:2px 8px;border-radius:4px;background:rgba(108,140,255,0.12);color:#6c8cff;border:1px solid rgba(108,140,255,0.25);cursor:pointer" onclick="document.dispatchEvent(new CustomEvent('tree-action',{detail:'break'}))">Break down</button></div>` : '';
+
+      let childrenHtml = '';
+      if (node.expanded && node.children.length > 0 && depth < this.maxDepth) {
+        const childItems = node.children.map(c =>
+          `<div style="display:flex;flex-direction:column;align-items:center;position:relative">
+            <div style="width:2px;height:14px;background:#2d3140"></div>
+            ${this.renderVerticalNode(c, depth + 1)}
+          </div>`
+        ).join('');
+
+        const connW = node.children.length > 1 ? 'calc(100% - 70px)' : '0';
+        childrenHtml = `
+          <div style="width:2px;height:14px;background:#2d3140;margin:0 auto"></div>
+          <div style="position:relative;display:flex;justify-content:center;gap:${this.spacing * 3}px">
+            ${childItems}
+          </div>`;
+      }
+
+      return `
+        <div style="display:flex;flex-direction:column;align-items:center" onclick="event.stopPropagation(); document.querySelector('[x-data]').__x.$data.toggleNode(${node.id})">
+          <div style="padding:8px 16px;border-radius:8px;font-size:13px;font-weight:500;background:${color}18;border:1.5px solid ${color}40;color:${color};cursor:pointer;white-space:nowrap;transition:all 0.15s;text-align:center">
+            ${node.children.length > 0 ? (node.expanded ? '&#9660; ' : '&#9654; ') : ''}${node.label}${countBadge}
+          </div>
+          ${aiBtn}
+          ${childrenHtml}
+        </div>`;
+    },
+
+    // ====== INDENTED LIST RENDERER ======
+    renderIndentedNode(node, depth) {
+      if (depth > this.maxDepth) return '';
+      const color = this.getColor(depth);
+      const count = this.countChildren(node);
+      const hasChildren = node.children.length > 0;
+      const chevron = hasChildren ?
+        `<span style="width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:#8b90a0;transition:transform 0.15s;transform:rotate(${node.expanded ? '90' : '0'}deg);flex-shrink:0">&#9654;</span>` :
+        `<span style="width:16px;flex-shrink:0"></span>`;
+
+      const dot = `<span style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0"></span>`;
+      const countBadge = this.showCount && count > 0 ? `<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:#232733;color:#8b90a0">${count}</span>` : '';
+      const aiBtn = this.showAiBtn ? `<button class="itree-ai-btn" onclick="event.stopPropagation()">Break down</button>` : '';
+
+      let childrenHtml = '';
+      if (node.expanded && hasChildren && depth < this.maxDepth) {
+        const items = node.children.map(c => this.renderIndentedNode(c, depth + 1)).join('');
+        childrenHtml = `<div style="padding-left:24px;border-left:1px solid #2d3140;margin-left:19px;${this.animate ? 'animation:slideDown 0.15s ease-out' : ''}">${items}</div>`;
+      }
+
+      return `
+        <div style="margin-bottom:${this.spacing / 2}px">
+          <div class="itree-row" onclick="document.querySelector('[x-data]').__x.$data.toggleNode(${node.id})" style="padding:${this.spacing}px 8px">
+            ${chevron}
+            ${dot}
+            <span style="font-size:13px;flex:1">${node.label}</span>
+            ${countBadge}
+            ${aiBtn}
+          </div>
+          ${childrenHtml}
+        </div>`;
+    },
+
+    // ====== CARD NODE GRAPH RENDERER ======
+    renderCardGraph() {
+      const nodes = [];
+      const lines = [];
+      const levelWidths = {};
+
+      const flatten = (node, depth, parentPos) => {
+        if (depth > this.maxDepth) return;
+        if (!levelWidths[depth]) levelWidths[depth] = 0;
+
+        const x = 40 + levelWidths[depth] * 180;
+        const y = 40 + depth * 120;
+        levelWidths[depth]++;
+
+        const pos = { x, y, id: node.id };
+        const color = this.getColor(depth);
+        const count = this.countChildren(node);
+        const countText = this.showCount && count > 0 ? `<p>${count} subtasks</p>` : '';
+        const aiBtn = this.showAiBtn && node.children.length === 0 ?
+          `<div class="cgraph-ai-btn" onclick="event.stopPropagation()">Break down</div>` : '';
+
+        nodes.push(`
+          <div class="cgraph-node" style="left:${x}px;top:${y}px" onclick="document.querySelector('[x-data]').__x.$data.toggleNode(${node.id})">
+            <div class="node-color" style="background:${color}"></div>
+            <h4>${node.label}</h4>
+            ${countText}
+            ${aiBtn}
+          </div>`);
+
+        if (parentPos) {
+          const x1 = parentPos.x + 70;
+          const y1 = parentPos.y + 65;
+          const x2 = x + 70;
+          const y2 = y;
+          lines.push(`<path class="cgraph-line" d="M${x1},${y1} C${x1},${(y1+y2)/2} ${x2},${(y1+y2)/2} ${x2},${y2}" />`);
+        }
+
+        if (node.expanded && node.children.length > 0) {
+          node.children.forEach(c => flatten(c, depth + 1, pos));
+        }
+      };
+
+      this.tree.forEach(n => flatten(n, 0, null));
+
+      const maxX = Math.max(...Object.values(levelWidths)) * 180 + 100;
+      const maxDepthUsed = Math.max(...Object.keys(levelWidths).map(Number));
+      const maxY = (maxDepthUsed + 1) * 120 + 80;
+
+      return `
+        <svg class="cgraph-svg" style="width:${maxX}px;height:${maxY}px">${lines.join('')}</svg>
+        ${nodes.join('')}
+      `;
+    },
+
+    generatePrompt() {
+      const styleNames = { vertical: 'vertical org-chart tree', indented: 'indented file-explorer list', cards: 'card-based node graph' };
+      const parts = [`Use a ${styleNames[this.style]} layout for the task tree.`];
+
+      if (this.colorByDepth) parts.push('Color-code nodes by depth level.');
+      if (this.showAiBtn) parts.push('Each node has a "Break down" button that calls Gemini AI to generate subtasks.');
+      if (this.showCount) parts.push('Show subtask count badges.');
+      if (this.animate) parts.push('Animate expand/collapse transitions.');
+      parts.push(`Support ${this.maxDepth}+ levels of nesting with ${this.spacing}px spacing between nodes.`);
+      parts.push('Built with Alpine.js and Tailwind CSS. Single HTML file.');
+
+      return parts.join(' ');
+    },
+
+    copyPrompt() {
+      navigator.clipboard.writeText(this.generatePrompt());
+      this.copied = true;
+      setTimeout(() => this.copied = false, 1500);
+    }
+  }));
+});
+</script>
+
+<style>
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</body>
+</html>
