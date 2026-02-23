@@ -23,6 +23,9 @@ app.use('/api', taskRoutes);
 const blockerRoutes = require('./routes/blockers');
 app.use('/api/tasks', blockerRoutes);
 
+const geminiRoutes = require('./routes/gemini');
+app.use('/api/gemini', geminiRoutes);
+
 app.listen(PORT, () => {
   console.log(`Tasker running on http://localhost:${PORT}`);
 });
