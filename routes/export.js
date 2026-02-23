@@ -2,10 +2,11 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db/pool');
 
-// GET /api/export - dump all data as JSON (fix #1: REPEATABLE READ transaction)
+// GET /api/export - dump all data as JSON
 router.get('/', async (req, res) => {
-  const client = await pool.connect();
+  let client;
   try {
+    client = await pool.connect();
     await client.query('BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ');
     const projects = (await client.query('SELECT * FROM projects ORDER BY created_at')).rows;
     const tasks = (await client.query('SELECT * FROM tasks ORDER BY created_at')).rows;
@@ -20,11 +21,11 @@ router.get('/', async (req, res) => {
       task_blockers: blockers,
     });
   } catch (err) {
-    await client.query('ROLLBACK').catch(() => {});
+    if (client) await client.query('ROLLBACK').catch(() => {});
     console.error('Error exporting data:', err);
     res.status(500).json({ error: 'Failed to export data' });
   } finally {
-    client.release();
+    if (client) client.release();
   }
 });
 
@@ -73,6 +74,7 @@ router.post('/', jsonLarge, async (req, res) => {
     let maxPasses = 20;
     while (remaining.length > 0 && maxPasses-- > 0) {
       const next = [];
+      let insertedThisPass = 0;
       for (const t of remaining) {
         if (!t.parent_id || inserted.has(t.parent_id)) {
           await client.query(
@@ -81,11 +83,13 @@ router.post('/', jsonLarge, async (req, res) => {
             [t.id, t.project_id, t.parent_id, t.label, t.position, t.is_expanded, t.created_at, t.updated_at]
           );
           inserted.add(t.id);
+          insertedThisPass++;
         } else {
           next.push(t);
         }
       }
       remaining = next;
+      if (insertedThisPass === 0 && remaining.length > 0) break;
     }
 
     // fix #3: fail if tasks couldn't be inserted (circular refs or orphans)
