@@ -472,14 +472,35 @@
         </button>
       </div>
       <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        <!-- Provider Cards -->
         <div>
-          <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-1.5">Provider</label>
-          <select x-model="settingsForm.ai_provider" @change="onProviderChange()" class="w-full bg-surface2 text-txt text-sm px-3 py-2 rounded-md border border-border focus:border-accent focus:outline-none">
-            <option value="gemini">Google Gemini</option>
-            <option value="openai">OpenAI (or compatible: LM Studio, Ollama, Groq)</option>
-            <option value="anthropic">Anthropic Claude</option>
-          </select>
+          <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-2">Provider</label>
+          <div class="flex flex-col gap-2">
+            <template x-for="prov in providerList" :key="prov.key">
+              <div class="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all border"
+                :class="settingsForm.ai_provider === prov.key
+                  ? 'border-accent bg-accent/10'
+                  : 'border-border bg-surface2/50 hover:border-accent/40'"
+                @click="settingsForm.ai_provider = prov.key; onProviderChange()">
+                <span class="w-8 h-8 rounded-lg flex items-center justify-center text-sm flex-shrink-0"
+                  :style="'background:' + prov.color + '20;color:' + prov.color" x-text="prov.icon"></span>
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm font-medium text-txt" x-text="prov.name"></div>
+                  <div class="text-[11px] text-muted truncate" x-text="prov.desc"></div>
+                </div>
+                <span class="text-[10px] px-2 py-0.5 rounded-full flex-shrink-0"
+                  :class="isProviderConfigured(prov.key)
+                    ? 'bg-green-500/15 text-green-400'
+                    : 'bg-surface2 text-muted/60'"
+                  x-text="isProviderConfigured(prov.key) ? 'Ready' : 'Not set up'"></span>
+              </div>
+            </template>
+          </div>
         </div>
+
+        <div class="border-t border-border"></div>
+
+        <!-- API Key -->
         <div>
           <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-1.5">API Key</label>
           <div class="flex gap-2">
@@ -492,8 +513,16 @@
               <span x-show="fetchingModels">Loading...</span>
             </button>
           </div>
-          <p class="text-xs text-muted/60 mt-1">Stored in your browser only. Never saved on the server.</p>
+          <div class="flex items-center gap-1.5 mt-1.5">
+            <span class="w-1.5 h-1.5 rounded-full flex-shrink-0"
+              :class="isProviderConfigured(settingsForm.ai_provider) ? 'bg-green-400' : 'bg-red-400'"></span>
+            <span class="text-[11px]"
+              :class="isProviderConfigured(settingsForm.ai_provider) ? 'text-green-400/70' : 'text-red-400/70'"
+              x-text="isProviderConfigured(settingsForm.ai_provider) ? 'API key saved in browser' : 'No API key set'"></span>
+          </div>
         </div>
+
+        <!-- Base URL -->
         <div>
           <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-1.5">API Base URL <span class="normal-case text-muted/60">(optional, for custom endpoints)</span></label>
           <input type="text" x-model="settingsForm.ai_base_url"
@@ -501,6 +530,8 @@
             class="w-full bg-surface2 text-txt text-sm px-3 py-2 rounded-md border border-border focus:border-accent focus:outline-none placeholder-muted/40">
           <p class="text-xs text-muted/60 mt-1">Leave blank for default. Use custom URL for LM Studio, Ollama, etc.</p>
         </div>
+
+        <!-- Model -->
         <div>
           <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-1.5">Model</label>
           <template x-if="availableModels.length > 0">
@@ -559,6 +590,12 @@
         settingsSaving: false,
         availableModels: [],
         fetchingModels: false,
+        _keyRevision: 0,
+        providerList: [
+          { key: 'gemini', name: 'Google Gemini', desc: 'Fast, free tier available', icon: '\u2726', color: '#4285f4' },
+          { key: 'openai', name: 'OpenAI', desc: 'GPT-4o, compatible with LM Studio/Ollama', icon: '\u25CE', color: '#10a37f' },
+          { key: 'anthropic', name: 'Anthropic Claude', desc: 'Claude Sonnet/Opus', icon: '\u25C8', color: '#d97706' },
+        ],
 
         // Blocker state
         blockerTaskId: null,
@@ -627,6 +664,11 @@
         },
 
         // ---- Helpers ----
+        isProviderConfigured(providerKey) {
+          this._keyRevision; // reactive dependency — forces Alpine to re-evaluate when keys change
+          return !!localStorage.getItem('tasker_ai_key_' + providerKey);
+        },
+
         showToast(message, type = 'info') {
           this.toast = { show: true, message, type };
           setTimeout(() => { this.toast.show = false; }, 3000);
@@ -1161,6 +1203,7 @@
         async openSettings() {
           this.showSettings = true;
           this.availableModels = [];
+          this._keyRevision++; // force badge re-evaluation from localStorage
           try {
             // Load all provider configs from DB
             const res = await fetch('/api/settings');
@@ -1204,6 +1247,9 @@
             } else {
               localStorage.removeItem('tasker_ai_key_' + provider);
             }
+
+            // Bump reactive tracker so provider badges re-evaluate
+            this._keyRevision++;
 
             // Update local cache
             this._providerConfigs[provider] = {
