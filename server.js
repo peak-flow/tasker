@@ -20,6 +20,9 @@ app.use('/api/projects', projectRoutes);
 const taskRoutes = require('./routes/tasks');
 app.use('/api', taskRoutes);
 
+const blockerRoutes = require('./routes/blockers');
+app.use('/api/tasks', blockerRoutes);
+
 app.listen(PORT, () => {
   console.log(`Tasker running on http://localhost:${PORT}`);
 });
