@@ -970,17 +970,25 @@
               return;
             }
             // Create each subtask
+            let created = 0;
             for (const label of subtasks) {
-              await fetch('/api/tasks', {
+              const r = await fetch('/api/tasks', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ label, project_id: this.selectedProjectId, parent_id: item.id }),
               });
+              if (r.ok) created++;
             }
             // Expand parent and refresh
             await this._setExpanded(item.id, true);
             await this.fetchTasks();
-            this.showToast(`Added ${subtasks.length} subtasks`);
+            if (created === subtasks.length) {
+              this.showToast(`Added ${created} subtasks`);
+            } else if (created > 0) {
+              this.showToast(`Added ${created}/${subtasks.length} subtasks (some failed)`, 'error');
+            } else {
+              this.showToast('Failed to create subtasks', 'error');
+            }
           } catch (err) {
             console.error('breakdownTask:', err);
             this.showToast(err.message || 'AI breakdown failed', 'error');
