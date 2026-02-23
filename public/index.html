@@ -121,7 +121,7 @@
         </template>
       </div>
 
-      <!-- Add project -->
+      <!-- Add project + Settings -->
       <div class="px-3 py-3 border-t border-border">
         <form @submit.prevent="createProject()" class="flex items-center gap-2">
           <input type="text" x-model="newProjectName" placeholder="New project..."
@@ -131,6 +131,10 @@
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
           </button>
         </form>
+        <button @click="openSettings()" class="mt-2 w-full flex items-center gap-2 px-3 py-1.5 text-xs text-muted hover:text-txt hover:bg-surface2 rounded-md transition-colors" title="AI Settings">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          AI Settings
+        </button>
       </div>
     </aside>
 
@@ -458,6 +462,111 @@
     </div>
   </div>
 
+  <!-- ==================== SETTINGS MODAL ==================== -->
+  <div x-show="showSettings" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" @keydown.escape.window="showSettings && closeSettings()">
+    <div class="bg-surface rounded-lg border border-border shadow-2xl w-[480px] max-w-[90vw] max-h-[80vh] flex flex-col" @click.outside="closeSettings()">
+      <div class="px-5 py-4 border-b border-border flex items-center justify-between">
+        <h3 class="text-sm font-medium text-txt">AI Settings</h3>
+        <button @click="closeSettings()" class="p-1 rounded hover:bg-surface2 text-muted hover:text-txt">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        <!-- Provider Cards -->
+        <div>
+          <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-2">Provider</label>
+          <div class="flex flex-col gap-2">
+            <template x-for="prov in providerList" :key="prov.key">
+              <div class="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all border"
+                :class="settingsForm.ai_provider === prov.key
+                  ? 'border-accent bg-accent/10'
+                  : 'border-border bg-surface2/50 hover:border-accent/40'"
+                @click="settingsForm.ai_provider = prov.key; onProviderChange()">
+                <span class="w-8 h-8 rounded-lg flex items-center justify-center text-sm flex-shrink-0"
+                  :style="'background:' + prov.color + '20;color:' + prov.color" x-text="prov.icon"></span>
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm font-medium text-txt" x-text="prov.name"></div>
+                  <div class="text-[11px] text-muted truncate" x-text="prov.desc"></div>
+                </div>
+                <span class="text-[10px] px-2 py-0.5 rounded-full flex-shrink-0"
+                  :class="isProviderConfigured(prov.key)
+                    ? 'bg-green-500/15 text-green-400'
+                    : 'bg-surface2 text-muted/60'"
+                  x-text="isProviderConfigured(prov.key) ? 'Ready' : 'Not set up'"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <div class="border-t border-border"></div>
+
+        <!-- API Key -->
+        <div>
+          <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-1.5">API Key</label>
+          <div class="flex gap-2">
+            <input type="password" x-model="settingsForm.ai_api_key"
+              placeholder="Enter API key"
+              class="flex-1 bg-surface2 text-txt text-sm px-3 py-2 rounded-md border border-border focus:border-accent focus:outline-none placeholder-muted/40">
+            <button @click="fetchModels()" :disabled="fetchingModels || !settingsForm.ai_api_key.trim()"
+              class="px-3 py-2 text-xs bg-surface2 text-muted hover:text-txt border border-border rounded-md hover:border-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors whitespace-nowrap">
+              <span x-show="!fetchingModels">Fetch Models</span>
+              <span x-show="fetchingModels">Loading...</span>
+            </button>
+          </div>
+          <div class="flex items-center gap-1.5 mt-1.5">
+            <span class="w-1.5 h-1.5 rounded-full flex-shrink-0"
+              :class="isProviderConfigured(settingsForm.ai_provider) ? 'bg-green-400' : 'bg-red-400'"></span>
+            <span class="text-[11px]"
+              :class="isProviderConfigured(settingsForm.ai_provider) ? 'text-green-400/70' : 'text-red-400/70'"
+              x-text="isProviderConfigured(settingsForm.ai_provider) ? 'API key saved in browser' : 'No API key set'"></span>
+          </div>
+        </div>
+
+        <!-- Base URL -->
+        <div>
+          <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-1.5">API Base URL <span class="normal-case text-muted/60">(optional, for custom endpoints)</span></label>
+          <input type="text" x-model="settingsForm.ai_base_url"
+            :placeholder="settingsForm.ai_provider === 'openai' ? 'https://api.openai.com/v1' : settingsForm.ai_provider === 'anthropic' ? 'https://api.anthropic.com' : 'https://generativelanguage.googleapis.com/v1beta'"
+            class="w-full bg-surface2 text-txt text-sm px-3 py-2 rounded-md border border-border focus:border-accent focus:outline-none placeholder-muted/40">
+          <p class="text-xs text-muted/60 mt-1">Leave blank for default. Use custom URL for LM Studio, Ollama, etc.</p>
+        </div>
+
+        <!-- Model -->
+        <div>
+          <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-1.5">Model</label>
+          <template x-if="availableModels.length > 0">
+            <div>
+              <select x-model="settingsForm.ai_model" class="w-full bg-surface2 text-txt text-sm px-3 py-2 rounded-md border border-border focus:border-accent focus:outline-none">
+                <option value="">Use default</option>
+                <template x-for="m in availableModels" :key="m">
+                  <option :value="m" x-text="m"></option>
+                </template>
+              </select>
+            </div>
+          </template>
+          <template x-if="availableModels.length === 0">
+            <input type="text" x-model="settingsForm.ai_model" placeholder="Leave blank for default"
+              class="w-full bg-surface2 text-txt text-sm px-3 py-2 rounded-md border border-border focus:border-accent focus:outline-none placeholder-muted/40">
+          </template>
+          <p class="text-xs text-muted/60 mt-1">
+            <span x-show="settingsForm.ai_provider === 'gemini'">Default: gemini-2.0-flash</span>
+            <span x-show="settingsForm.ai_provider === 'openai'">Default: gpt-4o-mini</span>
+            <span x-show="settingsForm.ai_provider === 'anthropic'">Default: claude-sonnet-4-20250514</span>
+            <span x-show="availableModels.length > 0" class="ml-1 text-green-400/70">(<span x-text="availableModels.length"></span> models found)</span>
+          </p>
+        </div>
+      </div>
+      <div class="px-5 py-3 border-t border-border flex justify-end gap-2">
+        <button @click="closeSettings()" class="px-4 py-2 text-sm text-muted hover:text-txt hover:bg-surface2 rounded-md transition-colors">Cancel</button>
+        <button @click="saveSettings()" :disabled="settingsSaving"
+          class="px-4 py-2 text-sm bg-accent text-white rounded-md hover:bg-accent/80 disabled:opacity-50 transition-colors">
+          <span x-show="!settingsSaving">Save</span>
+          <span x-show="settingsSaving">Saving...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script>
     function app() {
       return {
@@ -474,6 +583,19 @@
         loadingTasks: false,
         addingChildToId: null,
         toast: { show: false, message: '', type: 'info' },
+
+        // Settings state
+        showSettings: false,
+        settingsForm: { ai_provider: 'gemini', ai_base_url: '', ai_model: '', ai_api_key: '' },
+        settingsSaving: false,
+        availableModels: [],
+        fetchingModels: false,
+        _keyRevision: 0,
+        providerList: [
+          { key: 'gemini', name: 'Google Gemini', desc: 'Fast, free tier available', icon: '\u2726', color: '#4285f4' },
+          { key: 'openai', name: 'OpenAI', desc: 'GPT-4o, compatible with LM Studio/Ollama', icon: '\u25CE', color: '#10a37f' },
+          { key: 'anthropic', name: 'Anthropic Claude', desc: 'Claude Sonnet/Opus', icon: '\u25C8', color: '#d97706' },
+        ],
 
         // Blocker state
         blockerTaskId: null,
@@ -542,6 +664,11 @@
         },
 
         // ---- Helpers ----
+        isProviderConfigured(providerKey) {
+          this._keyRevision; // reactive dependency — forces Alpine to re-evaluate when keys change
+          return !!localStorage.getItem('tasker_ai_key_' + providerKey);
+        },
+
         showToast(message, type = 'info') {
           this.toast = { show: true, message, type };
           setTimeout(() => { this.toast.show = false; }, 3000);
@@ -822,10 +949,15 @@
           this.loadingTaskId = item.id;
           try {
             const context = this._getTaskContext(item);
-            const res = await fetch('/api/gemini/breakdown', {
+            const res = await fetch('/api/ai/breakdown', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ task_label: item.label, context: context || undefined }),
+              body: JSON.stringify({
+                task_label: item.label,
+                context: context || undefined,
+                provider: localStorage.getItem('tasker_active_provider') || 'gemini',
+                api_key: localStorage.getItem('tasker_ai_key_' + (localStorage.getItem('tasker_active_provider') || 'gemini')) || undefined,
+              }),
             });
             if (!res.ok) {
               const errData = await res.json().catch(() => ({}));
@@ -838,17 +970,25 @@
               return;
             }
             // Create each subtask
+            let created = 0;
             for (const label of subtasks) {
-              await fetch('/api/tasks', {
+              const r = await fetch('/api/tasks', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ label, project_id: this.selectedProjectId, parent_id: item.id }),
               });
+              if (r.ok) created++;
             }
             // Expand parent and refresh
             await this._setExpanded(item.id, true);
             await this.fetchTasks();
-            this.showToast(`Added ${subtasks.length} subtasks`);
+            if (created === subtasks.length) {
+              this.showToast(`Added ${created} subtasks`);
+            } else if (created > 0) {
+              this.showToast(`Added ${created}/${subtasks.length} subtasks (some failed)`, 'error');
+            } else {
+              this.showToast('Failed to create subtasks', 'error');
+            }
           } catch (err) {
             console.error('breakdownTask:', err);
             this.showToast(err.message || 'AI breakdown failed', 'error');
@@ -1010,6 +1150,139 @@
             console.error('importData:', err);
             this.showToast(err.message || 'Failed to import', 'error');
           }
+        },
+
+        // ---- Settings ----
+        // Provider configs cache (loaded from DB)
+        _providerConfigs: {},
+
+        onProviderChange() {
+          // Load saved config for the new provider
+          const p = this.settingsForm.ai_provider;
+          const saved = this._providerConfigs[p] || {};
+          this.settingsForm.ai_base_url = saved.base_url || '';
+          this.settingsForm.ai_model = saved.model || '';
+          this.settingsForm.ai_api_key = localStorage.getItem('tasker_ai_key_' + p) || '';
+          this.availableModels = [];
+        },
+
+        async fetchModels() {
+          const key = this.settingsForm.ai_api_key.trim();
+          if (!key) return;
+          this.fetchingModels = true;
+          this.availableModels = [];
+          try {
+            const provider = this.settingsForm.ai_provider;
+            const baseUrl = this.settingsForm.ai_base_url.trim();
+            let models = [];
+
+            if (provider === 'gemini') {
+              const url = (baseUrl || 'https://generativelanguage.googleapis.com/v1beta') + '/models?key=' + key;
+              const res = await fetch(url);
+              if (!res.ok) throw new Error('Failed to fetch models');
+              const data = await res.json();
+              models = (data.models || [])
+                .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'))
+                .map(m => m.name.replace('models/', ''));
+            } else if (provider === 'openai') {
+              const url = (baseUrl || 'https://api.openai.com/v1') + '/models';
+              const headers = key ? { 'Authorization': 'Bearer ' + key } : {};
+              const res = await fetch(url, { headers });
+              if (!res.ok) throw new Error('Failed to fetch models');
+              const data = await res.json();
+              models = (data.data || []).map(m => m.id).sort();
+            } else if (provider === 'anthropic') {
+              const res = await fetch('/api/ai/models', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ provider: 'anthropic', api_key: key, base_url: baseUrl || undefined }),
+              });
+              if (!res.ok) throw new Error('Failed to fetch models');
+              const data = await res.json();
+              models = data.models || [];
+            }
+
+            this.availableModels = models;
+            if (models.length > 0) {
+              this.showToast(`Found ${models.length} models`);
+            } else {
+              this.showToast('No models found', 'error');
+            }
+          } catch (err) {
+            this.showToast(err.message || 'Failed to fetch models', 'error');
+          } finally {
+            this.fetchingModels = false;
+          }
+        },
+
+        async openSettings() {
+          this.showSettings = true;
+          this.availableModels = [];
+          this._keyRevision++; // force badge re-evaluation from localStorage
+          try {
+            // Load all provider configs from DB
+            const res = await fetch('/api/settings');
+            if (!res.ok) throw new Error('fetch failed');
+            this._providerConfigs = await res.json();
+
+            // Load active provider from localStorage
+            const activeProvider = localStorage.getItem('tasker_active_provider') || 'gemini';
+            this.settingsForm.ai_provider = activeProvider;
+
+            // Load that provider's config
+            const saved = this._providerConfigs[activeProvider] || {};
+            this.settingsForm.ai_base_url = saved.base_url || '';
+            this.settingsForm.ai_model = saved.model || '';
+            this.settingsForm.ai_api_key = localStorage.getItem('tasker_ai_key_' + activeProvider) || '';
+          } catch (err) {
+            this.showToast('Failed to load settings', 'error');
+          }
+        },
+
+        async saveSettings() {
+          this.settingsSaving = true;
+          try {
+            const provider = this.settingsForm.ai_provider;
+
+            // Save this provider's url/model to DB
+            const res = await fetch('/api/settings/' + provider, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                base_url: this.settingsForm.ai_base_url || null,
+                model: this.settingsForm.ai_model || null,
+              }),
+            });
+            if (!res.ok) throw new Error('save failed');
+
+            // Save active provider + API key to localStorage
+            localStorage.setItem('tasker_active_provider', provider);
+            if (this.settingsForm.ai_api_key.trim()) {
+              localStorage.setItem('tasker_ai_key_' + provider, this.settingsForm.ai_api_key.trim());
+            } else {
+              localStorage.removeItem('tasker_ai_key_' + provider);
+            }
+
+            // Bump reactive tracker so provider badges re-evaluate
+            this._keyRevision++;
+
+            // Update local cache
+            this._providerConfigs[provider] = {
+              base_url: this.settingsForm.ai_base_url || null,
+              model: this.settingsForm.ai_model || null,
+            };
+
+            this.showToast('Settings saved');
+            this.showSettings = false;
+          } catch (err) {
+            this.showToast('Failed to save settings', 'error');
+          } finally {
+            this.settingsSaving = false;
+          }
+        },
+
+        closeSettings() {
+          this.showSettings = false;
         },
       };
     }
