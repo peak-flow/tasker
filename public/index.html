@@ -149,6 +149,17 @@
         <template x-if="!selectedProject">
           <div><h2 class="text-lg font-medium text-muted">Select a project</h2></div>
         </template>
+        <div class="flex items-center gap-1.5">
+          <button @click="exportData()" class="px-2.5 py-1.5 text-xs text-muted hover:text-txt hover:bg-surface2 rounded-md transition-colors flex items-center gap-1.5" title="Export all data">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Export
+          </button>
+          <label class="px-2.5 py-1.5 text-xs text-muted hover:text-txt hover:bg-surface2 rounded-md transition-colors flex items-center gap-1.5 cursor-pointer" title="Import data">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+            Import
+            <input type="file" accept=".json" @change="importData($event)" class="hidden">
+          </label>
+        </div>
       </div>
 
       <!-- Task Tree Area -->
@@ -938,6 +949,63 @@
           this.blockers = [];
           this.blockerSearch = '';
           this.blockerNote = '';
+        },
+
+        // ---- Export / Import ----
+        async exportData() {
+          try {
+            const res = await fetch('/api/export');
+            if (!res.ok) throw new Error('Export failed');
+            const data = await res.json();
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `tasker-export-${new Date().toISOString().slice(0, 10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            this.showToast(`Exported ${data.projects.length} projects, ${data.tasks.length} tasks`);
+          } catch (err) {
+            console.error('exportData:', err);
+            this.showToast('Failed to export data', 'error');
+          }
+        },
+
+        async importData(event) {
+          const file = event.target.files[0];
+          if (!file) return;
+          event.target.value = '';
+
+          if (!confirm('This will replace ALL existing projects, tasks, and blockers. Continue?')) return;
+
+          try {
+            const text = await file.text();
+            const data = JSON.parse(text);
+
+            if (!data.projects || !Array.isArray(data.projects)) {
+              throw new Error('Invalid file: missing projects array');
+            }
+
+            const res = await fetch('/api/export', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: text,
+            });
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              throw new Error(err.error || 'Import failed');
+            }
+            const result = await res.json();
+            this.showToast(`Imported ${result.imported.projects} projects, ${result.imported.tasks} tasks`);
+
+            // Reload
+            this.selectedProjectId = null;
+            this.tasks = [];
+            await this.fetchProjects();
+          } catch (err) {
+            console.error('importData:', err);
+            this.showToast(err.message || 'Failed to import', 'error');
+          }
         },
       };
     }
