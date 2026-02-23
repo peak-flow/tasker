@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tasker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            bg: '#0f1117',
+            surface: '#1a1d27',
+            surface2: '#232733',
+            border: '#2d3140',
+            txt: '#e1e4ed',
+            muted: '#8b90a0',
+            accent: '#6c8cff',
+            'accent-dim': '#3d5199',
+          },
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'system-ui', 'sans-serif'],
+          },
+        },
+      },
+    }
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+
+    /* Scrollbar styling */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #2d3140; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3d5199; }
+
+    /* Smooth transitions */
+    .task-row { transition: background-color 0.15s ease; }
+
+    /* Spinner animation */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { animation: spin 0.8s linear infinite; }
+
+    /* Input focus reset */
+    input:focus, textarea:focus { outline: none; }
+  </style>
+</head>
+<body class="bg-bg text-txt font-sans min-h-screen" x-data="app()" x-cloak>
+
+  <!-- Main Layout -->
+  <div class="flex min-h-screen">
+
+    <!-- ==================== SIDEBAR ==================== -->
+    <aside class="w-64 flex-shrink-0 bg-surface border-r border-border flex flex-col">
+
+      <!-- Logo -->
+      <div class="px-4 py-4 border-b border-border">
+        <h1 class="text-lg font-semibold text-txt flex items-center gap-2">
+          <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+          </svg>
+          Tasker
+        </h1>
+      </div>
+
+      <!-- Project List -->
+      <div class="flex-1 overflow-y-auto py-2">
+        <div class="px-3 mb-2">
+          <span class="text-[11px] uppercase tracking-wider text-muted font-medium">Projects</span>
+        </div>
+
+        <template x-for="project in projects" :key="project.id">
+          <div
+            class="group flex items-center gap-2 px-3 py-2 mx-2 rounded-md cursor-pointer transition-colors"
+            :class="selectedProjectId === project.id ? 'bg-accent/15 text-accent' : 'hover:bg-surface2 text-txt'"
+            @click="selectProject(project.id)"
+          >
+            <!-- Color dot -->
+            <span class="w-2.5 h-2.5 rounded-full flex-shrink-0"
+              :style="'background-color:' + (project.color || '#6c8cff')"></span>
+
+            <!-- Inline edit mode -->
+            <template x-if="editingProjectId === project.id">
+              <input type="text"
+                class="flex-1 bg-surface2 text-txt text-sm px-2 py-0.5 rounded border border-border focus:border-accent min-w-0"
+                :value="project.name"
+                @keydown.enter="$el.dataset.saved = '1'; updateProject(project.id, { name: $el.value }); editingProjectId = null"
+                @keydown.escape="editingProjectId = null"
+                @click.stop
+                @blur="if (!$el.dataset.saved && $el.value.trim() && $el.value !== project.name) { updateProject(project.id, { name: $el.value }); } editingProjectId = null"
+                x-init="$nextTick(() => { $el.focus(); $el.select(); })">
+            </template>
+
+            <!-- Display mode -->
+            <template x-if="editingProjectId !== project.id">
+              <span class="flex-1 text-sm truncate" @dblclick.stop="editingProjectId = project.id" x-text="project.name"></span>
+            </template>
+
+            <!-- Hover actions -->
+            <template x-if="editingProjectId !== project.id">
+              <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button class="p-1 rounded hover:bg-surface2 text-muted hover:text-txt" @click.stop="editingProjectId = project.id" title="Edit name">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                </button>
+                <button class="p-1 rounded hover:bg-red-500/20 text-muted hover:text-red-400" @click.stop="deleteProject(project.id)" title="Delete project">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+              </div>
+            </template>
+          </div>
+        </template>
+
+        <!-- Empty state -->
+        <template x-if="projects.length === 0">
+          <div class="px-4 py-8 text-center">
+            <p class="text-muted text-sm">No projects yet.</p>
+            <p class="text-muted text-xs mt-1">Create one below to get started.</p>
+          </div>
+        </template>
+      </div>
+
+      <!-- Add project -->
+      <div class="px-3 py-3 border-t border-border">
+        <form @submit.prevent="createProject()" class="flex items-center gap-2">
+          <input type="text" x-model="newProjectName" placeholder="New project..."
+            class="flex-1 bg-surface2 text-txt text-sm px-3 py-1.5 rounded-md border border-border focus:border-accent placeholder-muted/50">
+          <button type="submit" :disabled="!newProjectName.trim()"
+            class="px-2.5 py-1.5 bg-accent text-white text-sm rounded-md hover:bg-accent/80 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          </button>
+        </form>
+      </div>
+    </aside>
+
+    <!-- ==================== MAIN CONTENT ==================== -->
+    <main class="flex-1 flex flex-col overflow-hidden">
+
+      <!-- Header -->
+      <div class="px-6 py-4 border-b border-border bg-surface flex items-center justify-between">
+        <template x-if="selectedProject">
+          <div class="flex items-center gap-3">
+            <span class="w-3 h-3 rounded-full" :style="'background-color:' + (selectedProject.color || '#6c8cff')"></span>
+            <h2 class="text-lg font-medium text-txt" x-text="selectedProject.name"></h2>
+            <span class="text-xs text-muted bg-surface2 px-2 py-0.5 rounded-full" x-text="taskCount + ' tasks'"></span>
+          </div>
+        </template>
+        <template x-if="!selectedProject">
+          <div><h2 class="text-lg font-medium text-muted">Select a project</h2></div>
+        </template>
+      </div>
+
+      <!-- Task Tree Area -->
+      <div class="flex-1 overflow-y-auto">
+
+        <!-- Active project with tasks loaded -->
+        <template x-if="selectedProjectId && !loadingTasks">
+          <div class="px-4 py-3">
+
+            <!-- Unified flat items loop: tasks + add-child rows interleaved -->
+            <template x-for="item in flatItems" :key="item._key">
+              <div>
+
+                <!-- === TASK ROW === -->
+                <template x-if="item._type === 'task'">
+                  <div class="task-row flex items-center gap-1.5 py-1.5 pr-2 rounded-md hover:bg-surface2/50 group relative"
+                    :style="'padding-left:' + (item.depth * 24 + 8) + 'px'">
+
+                    <!-- Connector line -->
+                    <template x-if="item.depth > 0">
+                      <div class="absolute top-0 bottom-0 border-l border-border"
+                        :style="'left:' + ((item.depth - 1) * 24 + 20) + 'px'"></div>
+                    </template>
+
+                    <!-- Chevron expand/collapse -->
+                    <button class="w-5 h-5 flex items-center justify-center rounded hover:bg-surface2 flex-shrink-0"
+                      :class="item._hasChildren ? 'text-muted hover:text-txt cursor-pointer' : 'text-transparent cursor-default'"
+                      @click="item._hasChildren && toggleExpand(item)">
+                      <svg class="w-3.5 h-3.5 transition-transform duration-150" :class="item.is_expanded ? 'rotate-90' : ''"
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                      </svg>
+                    </button>
+
+                    <!-- Color dot -->
+                    <span class="w-2 h-2 rounded-full flex-shrink-0" :style="'background-color:' + getColor(item.depth)"></span>
+
+                    <!-- Inline edit -->
+                    <template x-if="editingTaskId === item.id">
+                      <input type="text"
+                        class="flex-1 bg-surface2 text-txt text-sm px-2 py-0.5 rounded border border-border focus:border-accent min-w-0"
+                        :value="item.label"
+                        @keydown.enter="$el.dataset.saved = '1'; updateTask(item.id, { label: $el.value }); editingTaskId = null"
+                        @keydown.escape="editingTaskId = null"
+                        @click.stop
+                        @blur="if (!$el.dataset.saved && $el.value.trim() && $el.value !== item.label) { updateTask(item.id, { label: $el.value }); } editingTaskId = null"
+                        x-init="$nextTick(() => { $el.focus(); $el.select(); })">
+                    </template>
+
+                    <!-- Display label -->
+                    <template x-if="editingTaskId !== item.id">
+                      <span class="flex-1 text-sm text-txt truncate cursor-text" @dblclick="editingTaskId = item.id" x-text="item.label"></span>
+                    </template>
+
+                    <!-- Descendant count badge -->
+                    <template x-if="item._descendantCount > 0">
+                      <span class="text-[10px] text-muted bg-surface2 px-1.5 py-0.5 rounded-full flex-shrink-0" x-text="item._descendantCount"></span>
+                    </template>
+
+                    <!-- AI loading spinner -->
+                    <template x-if="loadingTaskId === item.id">
+                      <div class="flex-shrink-0">
+                        <svg class="w-4 h-4 text-accent spinner" fill="none" viewBox="0 0 24 24">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      </div>
+                    </template>
+
+                    <!-- Action buttons -->
+                    <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                      x-show="loadingTaskId !== item.id">
+                      <!-- Add child -->
+                      <button class="p-1 rounded hover:bg-surface2 text-muted hover:text-green-400" @click="startAddChild(item)" title="Add subtask">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                      </button>
+                      <!-- AI breakdown -->
+                      <button class="p-1 rounded hover:bg-purple-500/20 text-muted hover:text-purple-400" @click="breakdownTask(item)" title="AI breakdown">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                      </button>
+                      <!-- Edit -->
+                      <button class="p-1 rounded hover:bg-surface2 text-muted hover:text-txt" @click="editingTaskId = item.id" title="Edit label">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                      </button>
+                      <!-- Delete -->
+                      <button class="p-1 rounded hover:bg-red-500/20 text-muted hover:text-red-400" @click="deleteTask(item.id)" title="Delete task">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- === ADD CHILD ROW === -->
+                <template x-if="item._type === 'add-child'">
+                  <div :style="'padding-left:' + (item.depth * 24 + 8) + 'px'" class="py-1">
+                    <form @submit.prevent="submitChild(item._parentId)" class="flex items-center gap-2">
+                      <span class="w-2 h-2 rounded-full flex-shrink-0" :style="'background-color:' + getColor(item.depth)"></span>
+                      <input type="text" x-model="newChildLabel" placeholder="New subtask..."
+                        class="flex-1 bg-surface2 text-txt text-sm px-2 py-1 rounded border border-border focus:border-accent placeholder-muted/50"
+                        @keydown.escape="addingChildToId = null; newChildLabel = ''"
+                        x-init="$nextTick(() => $el.focus())">
+                      <button type="submit" :disabled="!newChildLabel.trim()" class="text-xs text-accent hover:text-accent/80 disabled:opacity-30">Add</button>
+                      <button type="button" @click="addingChildToId = null; newChildLabel = ''" class="text-xs text-muted hover:text-txt">Cancel</button>
+                    </form>
+                  </div>
+                </template>
+
+              </div>
+            </template>
+
+            <!-- Empty task state -->
+            <template x-if="tasks.length === 0">
+              <div class="py-16 text-center">
+                <svg class="w-12 h-12 text-muted/30 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+                <p class="text-muted text-sm">No tasks yet.</p>
+                <p class="text-muted/60 text-xs mt-1">Add your first task below.</p>
+              </div>
+            </template>
+
+            <!-- Add root task -->
+            <div class="mt-3 px-2">
+              <form @submit.prevent="createTask(newTaskLabel)" class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full flex-shrink-0 bg-accent"></span>
+                <input type="text" x-model="newTaskLabel" placeholder="Add a task..."
+                  class="flex-1 bg-surface2/50 text-txt text-sm px-3 py-1.5 rounded-md border border-border/50 focus:border-accent focus:bg-surface2 placeholder-muted/40 transition-colors">
+                <button type="submit" :disabled="!newTaskLabel.trim()"
+                  class="px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/10 rounded-md disabled:opacity-30 disabled:cursor-not-allowed transition-colors">Add</button>
+              </form>
+            </div>
+          </div>
+        </template>
+
+        <!-- Loading state -->
+        <template x-if="loadingTasks">
+          <div class="flex items-center justify-center py-16">
+            <svg class="w-6 h-6 text-accent spinner" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span class="ml-2 text-sm text-muted">Loading tasks...</span>
+          </div>
+        </template>
+
+        <!-- No project selected -->
+        <template x-if="!selectedProjectId">
+          <div class="flex flex-col items-center justify-center py-24">
+            <svg class="w-16 h-16 text-muted/20 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+            </svg>
+            <p class="text-muted text-base">Select a project to view tasks</p>
+            <p class="text-muted/50 text-sm mt-1">Or create a new project in the sidebar</p>
+          </div>
+        </template>
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast notification -->
+  <div x-show="toast.show"
+    x-transition:enter="transition ease-out duration-200"
+    x-transition:enter-start="opacity-0 translate-y-2"
+    x-transition:enter-end="opacity-100 translate-y-0"
+    x-transition:leave="transition ease-in duration-150"
+    x-transition:leave-start="opacity-100 translate-y-0"
+    x-transition:leave-end="opacity-0 translate-y-2"
+    class="fixed bottom-4 right-4 px-4 py-2.5 rounded-lg shadow-lg text-sm z-50"
+    :class="toast.type === 'error' ? 'bg-red-500/90 text-white' : 'bg-accent/90 text-white'"
+    x-text="toast.message">
+  </div>
+
+  <script>
+    function app() {
+      return {
+        // ---- State ----
+        projects: [],
+        selectedProjectId: null,
+        tasks: [],
+        newProjectName: '',
+        newTaskLabel: '',
+        newChildLabel: '',
+        editingProjectId: null,
+        editingTaskId: null,
+        loadingTaskId: null,
+        loadingTasks: false,
+        addingChildToId: null,
+        toast: { show: false, message: '', type: 'info' },
+
+        // ---- Computed ----
+        get selectedProject() {
+          return this.projects.find(p => p.id === this.selectedProjectId) || null;
+        },
+
+        // Total task count (all tasks in tree, not just visible)
+        get taskCount() {
+          const count = (tasks) => {
+            let n = 0;
+            for (const t of tasks) {
+              n += 1;
+              if (t.children) n += count(t.children);
+            }
+            return n;
+          };
+          return count(this.tasks);
+        },
+
+        // Flatten tree into interleaved list of task rows + add-child rows
+        get flatItems() {
+          const items = [];
+          const walk = (tasks, depth, visible = true) => {
+            for (const task of tasks) {
+              if (!visible) continue;
+              const descendantCount = this._countDesc(task);
+              const hasChildren = !!(task.children && task.children.length > 0);
+              items.push({
+                _type: 'task',
+                _key: task.id,
+                _hasChildren: hasChildren,
+                _descendantCount: descendantCount,
+                ...task,
+                depth,
+              });
+              // If this task is expanded and has children, render them
+              if (hasChildren && task.is_expanded) {
+                walk(task.children, depth + 1, true);
+              }
+              // If we are adding a child to this task, inject the add-child row
+              if (this.addingChildToId === task.id) {
+                items.push({
+                  _type: 'add-child',
+                  _key: 'add-' + task.id,
+                  _parentId: task.id,
+                  depth: depth + 1,
+                });
+              }
+            }
+          };
+          walk(this.tasks, 0, true);
+          return items;
+        },
+
+        // ---- Lifecycle ----
+        async init() {
+          await this.fetchProjects();
+        },
+
+        // ---- Helpers ----
+        showToast(message, type = 'info') {
+          this.toast = { show: true, message, type };
+          setTimeout(() => { this.toast.show = false; }, 3000);
+        },
+
+        depthColors: ['#6c8cff', '#4ade80', '#fb923c', '#a78bfa', '#f472b6'],
+        getColor(depth) { return this.depthColors[depth % 5]; },
+
+        _countDesc(task) {
+          let c = 0;
+          const walk = (children) => {
+            if (!children) return;
+            for (const ch of children) { c++; walk(ch.children); }
+          };
+          walk(task.children);
+          return c;
+        },
+
+        // Build parent chain label for AI context
+        _getTaskContext(task) {
+          const findPath = (tasks, targetId, path = []) => {
+            for (const t of tasks) {
+              if (t.id === targetId) return [...path, t.label];
+              if (t.children && t.children.length > 0) {
+                const r = findPath(t.children, targetId, [...path, t.label]);
+                if (r) return r;
+              }
+            }
+            return null;
+          };
+          const path = findPath(this.tasks, task.id) || [task.label];
+          return path.length > 1
+            ? path.slice(0, -1).join(' > ')
+            : (this.selectedProject ? this.selectedProject.name : '');
+        },
+
+        // Find task reference in the live tree (for optimistic updates)
+        _findTask(tasks, id) {
+          for (const t of tasks) {
+            if (t.id === id) return t;
+            if (t.children && t.children.length > 0) {
+              const f = this._findTask(t.children, id);
+              if (f) return f;
+            }
+          }
+          return null;
+        },
+
+        // ===========================
+        // PROJECT METHODS
+        // ===========================
+        async fetchProjects() {
+          try {
+            const res = await fetch('/api/projects');
+            if (!res.ok) throw new Error('fetch failed');
+            this.projects = await res.json();
+          } catch (err) {
+            console.error('fetchProjects:', err);
+            this.showToast('Failed to load projects', 'error');
+          }
+        },
+
+        async createProject() {
+          const name = this.newProjectName.trim();
+          if (!name) return;
+          try {
+            const res = await fetch('/api/projects', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name }),
+            });
+            if (!res.ok) throw new Error('create failed');
+            const project = await res.json();
+            this.projects.unshift(project);
+            this.newProjectName = '';
+            this.selectProject(project.id);
+          } catch (err) {
+            console.error('createProject:', err);
+            this.showToast('Failed to create project', 'error');
+          }
+        },
+
+        async updateProject(id, data) {
+          try {
+            const res = await fetch(`/api/projects/${id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data),
+            });
+            if (!res.ok) throw new Error('update failed');
+            const updated = await res.json();
+            const idx = this.projects.findIndex(p => p.id === id);
+            if (idx !== -1) this.projects[idx] = updated;
+          } catch (err) {
+            console.error('updateProject:', err);
+            this.showToast('Failed to update project', 'error');
+          }
+        },
+
+        async deleteProject(id) {
+          if (!confirm('Delete this project and all its tasks?')) return;
+          try {
+            const res = await fetch(`/api/projects/${id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('delete failed');
+            this.projects = this.projects.filter(p => p.id !== id);
+            if (this.selectedProjectId === id) {
+              this.selectedProjectId = null;
+              this.tasks = [];
+            }
+            this.showToast('Project deleted');
+          } catch (err) {
+            console.error('deleteProject:', err);
+            this.showToast('Failed to delete project', 'error');
+          }
+        },
+
+        async selectProject(id) {
+          if (this.selectedProjectId === id) return;
+          this.selectedProjectId = id;
+          this.editingTaskId = null;
+          this.addingChildToId = null;
+          this.newTaskLabel = '';
+          await this.fetchTasks();
+        },
+
+        // ===========================
+        // TASK METHODS
+        // ===========================
+        async fetchTasks() {
+          if (!this.selectedProjectId) return;
+          this.loadingTasks = true;
+          try {
+            const res = await fetch(`/api/projects/${this.selectedProjectId}/tasks`);
+            if (!res.ok) throw new Error('fetch failed');
+            this.tasks = await res.json();
+          } catch (err) {
+            console.error('fetchTasks:', err);
+            this.showToast('Failed to load tasks', 'error');
+          } finally {
+            this.loadingTasks = false;
+          }
+        },
+
+        async createTask(label, parentId = null) {
+          const trimmed = (label || '').trim();
+          if (!trimmed) return;
+          try {
+            const body = { label: trimmed, project_id: this.selectedProjectId };
+            if (parentId) body.parent_id = parentId;
+            const res = await fetch('/api/tasks', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body),
+            });
+            if (!res.ok) throw new Error('create failed');
+            // Expand parent if adding child
+            if (parentId) {
+              const parent = this._findTask(this.tasks, parentId);
+              if (parent && !parent.is_expanded) {
+                await this._setExpanded(parentId, true);
+              }
+            }
+            this.newTaskLabel = '';
+            this.newChildLabel = '';
+            await this.fetchTasks();
+          } catch (err) {
+            console.error('createTask:', err);
+            this.showToast('Failed to create task', 'error');
+          }
+        },
+
+        // Called from the add-child form
+        async submitChild(parentId) {
+          await this.createTask(this.newChildLabel, parentId);
+          this.addingChildToId = null;
+        },
+
+        async updateTask(id, data) {
+          try {
+            const res = await fetch(`/api/tasks/${id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data),
+            });
+            if (!res.ok) throw new Error('update failed');
+            if ('is_expanded' in data) {
+              const task = this._findTask(this.tasks, id);
+              if (task) task.is_expanded = data.is_expanded;
+            } else {
+              await this.fetchTasks();
+            }
+          } catch (err) {
+            console.error('updateTask:', err);
+            this.showToast('Failed to update task', 'error');
+          }
+        },
+
+        // Helper: just persist is_expanded without full refetch
+        async _setExpanded(id, val) {
+          try {
+            await fetch(`/api/tasks/${id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ is_expanded: val }),
+            });
+            const task = this._findTask(this.tasks, id);
+            if (task) task.is_expanded = val;
+          } catch (e) { /* silent */ }
+        },
+
+        async toggleExpand(item) {
+          const newState = !item.is_expanded;
+          // Optimistic local update
+          const task = this._findTask(this.tasks, item.id);
+          if (task) task.is_expanded = newState;
+          await this._setExpanded(item.id, newState);
+        },
+
+        async deleteTask(id) {
+          if (!confirm('Delete this task and all its subtasks?')) return;
+          try {
+            const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('delete failed');
+            await this.fetchTasks();
+            this.showToast('Task deleted');
+          } catch (err) {
+            console.error('deleteTask:', err);
+            this.showToast('Failed to delete task', 'error');
+          }
+        },
+
+        startAddChild(item) {
+          // Expand if collapsed with children
+          if (!item.is_expanded && item._hasChildren) {
+            this.toggleExpand(item);
+          }
+          this.addingChildToId = item.id;
+          this.newChildLabel = '';
+        },
+
+        async breakdownTask(item) {
+          if (this.loadingTaskId) return;
+          this.loadingTaskId = item.id;
+          try {
+            const context = this._getTaskContext(item);
+            const res = await fetch('/api/gemini/breakdown', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ task_label: item.label, context: context || undefined }),
+            });
+            if (!res.ok) {
+              const errData = await res.json().catch(() => ({}));
+              throw new Error(errData.error || 'AI breakdown failed');
+            }
+            const data = await res.json();
+            const subtasks = data.subtasks || [];
+            if (subtasks.length === 0) {
+              this.showToast('AI returned no subtasks', 'error');
+              return;
+            }
+            // Create each subtask
+            for (const label of subtasks) {
+              await fetch('/api/tasks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ label, project_id: this.selectedProjectId, parent_id: item.id }),
+              });
+            }
+            // Expand parent and refresh
+            await this._setExpanded(item.id, true);
+            await this.fetchTasks();
+            this.showToast(`Added ${subtasks.length} subtasks`);
+          } catch (err) {
+            console.error('breakdownTask:', err);
+            this.showToast(err.message || 'AI breakdown failed', 'error');
+          } finally {
+            this.loadingTaskId = null;
+          }
+        },
+      };
+    }
+  </script>
+</body>
+</html>
