@@ -2,12 +2,15 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db/pool');
 
-// GET /api/export - dump all data as JSON
+// GET /api/export - dump all data as JSON (fix #1: REPEATABLE READ transaction)
 router.get('/', async (req, res) => {
+  const client = await pool.connect();
   try {
-    const projects = (await pool.query('SELECT * FROM projects ORDER BY created_at')).rows;
-    const tasks = (await pool.query('SELECT * FROM tasks ORDER BY created_at')).rows;
-    const blockers = (await pool.query('SELECT * FROM task_blockers ORDER BY created_at')).rows;
+    await client.query('BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+    const projects = (await client.query('SELECT * FROM projects ORDER BY created_at')).rows;
+    const tasks = (await client.query('SELECT * FROM tasks ORDER BY created_at')).rows;
+    const blockers = (await client.query('SELECT * FROM task_blockers ORDER BY created_at')).rows;
+    await client.query('COMMIT');
 
     res.json({
       version: 1,
@@ -17,15 +20,23 @@ router.get('/', async (req, res) => {
       task_blockers: blockers,
     });
   } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
     console.error('Error exporting data:', err);
     res.status(500).json({ error: 'Failed to export data' });
+  } finally {
+    client.release();
   }
 });
 
+// Scoped 10mb limit for import only (fix #6)
+const jsonLarge = express.json({ limit: '10mb' });
+
 // POST /api/import - restore data from JSON
-router.post('/', async (req, res) => {
-  const client = await pool.connect();
+// fix #2: pool.connect() inside try block
+router.post('/', jsonLarge, async (req, res) => {
+  let client;
   try {
+    client = await pool.connect();
     const { projects, tasks, task_blockers } = req.body;
 
     if (!projects || !Array.isArray(projects)) {
@@ -77,6 +88,11 @@ router.post('/', async (req, res) => {
       remaining = next;
     }
 
+    // fix #3: fail if tasks couldn't be inserted (circular refs or orphans)
+    if (remaining.length > 0) {
+      throw new Error(`${remaining.length} tasks could not be inserted (missing parent references)`);
+    }
+
     // Insert blockers
     for (const b of (task_blockers || [])) {
       await client.query(
@@ -96,11 +112,12 @@ router.post('/', async (req, res) => {
       },
     });
   } catch (err) {
-    await client.query('ROLLBACK');
+    if (client) await client.query('ROLLBACK').catch(() => {});
     console.error('Error importing data:', err);
-    res.status(500).json({ error: 'Import failed: ' + err.message });
+    // fix #4: don't leak DB error details to client
+    res.status(500).json({ error: 'Import failed' });
   } finally {
-    client.release();
+    if (client) client.release();
   }
 });
 

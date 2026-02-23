@@ -962,7 +962,10 @@
             const a = document.createElement('a');
             a.href = url;
             a.download = `tasker-export-${new Date().toISOString().slice(0, 10)}.json`;
+            a.style.display = 'none';
+            document.body.appendChild(a);
             a.click();
+            document.body.removeChild(a);
             URL.revokeObjectURL(url);
             this.showToast(`Exported ${data.projects.length} projects, ${data.tasks.length} tasks`);
           } catch (err) {
@@ -998,7 +1001,8 @@
             const result = await res.json();
             this.showToast(`Imported ${result.imported.projects} projects, ${result.imported.tasks} tasks`);
 
-            // Reload
+            // Reload — close blocker panel if open (fix #7)
+            this.closeBlockerPanel();
             this.selectedProjectId = null;
             this.tasks = [];
             await this.fetchProjects();
