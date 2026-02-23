@@ -80,6 +80,55 @@ function getEnvKey(provider) {
   return process.env[map[provider]] || null;
 }
 
+// ── Pricing Endpoint ──
+
+router.post('/pricing', async (req, res) => {
+  try {
+    const { provider, api_key } = req.body;
+    if (!provider || !api_key) return res.status(400).json({ error: 'provider and api_key required' });
+
+    const callFn = PROVIDERS[provider];
+    if (!callFn) return res.status(400).json({ error: `Unknown provider: ${provider}` });
+
+    // Load provider config from DB
+    const { rows } = await pool.query('SELECT base_url, model FROM provider_configs WHERE provider = $1', [provider]);
+    const config = rows[0] || {};
+
+    const prompt = `Return current API pricing for the major LLM models from Google Gemini, OpenAI, and Anthropic.
+
+For each model, provide:
+- model ID (the API identifier, e.g. "gpt-4o", "gemini-2.5-pro", "claude-sonnet-4-6")
+- provider: "gemini", "openai", or "anthropic"
+- input price per 1 million tokens (as a string like "2.50")
+- output price per 1 million tokens (as a string like "10.00")
+
+Include these models if you know their pricing:
+Gemini: gemini-2.0-flash, gemini-2.5-flash, gemini-2.5-pro, gemini-3-pro, gemini-3-flash
+OpenAI: gpt-4o, gpt-4o-mini, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, o3, o3-mini, o4-mini
+Anthropic: claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5
+
+Return ONLY a JSON object where each key is the model ID and the value is { "provider": "...", "input": "...", "output": "..." }.
+No markdown, no explanation, just the JSON object.`;
+
+    const text = await callFn({
+      prompt,
+      apiKey: api_key,
+      baseUrl: config.base_url,
+      model: config.model,
+    });
+
+    // Extract JSON object from response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return res.status(502).json({ error: 'Could not parse AI response' });
+
+    const pricing = JSON.parse(jsonMatch[0]);
+    res.json({ pricing });
+  } catch (err) {
+    console.error('Error fetching pricing:', err);
+    res.status(500).json({ error: err.message || 'Failed to fetch pricing' });
+  }
+});
+
 // ── Models Endpoint ──
 
 router.post('/models', async (req, res) => {

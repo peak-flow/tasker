@@ -554,6 +554,55 @@
             <span x-show="settingsForm.ai_provider === 'anthropic'">Default: claude-sonnet-4-20250514</span>
             <span x-show="availableModels.length > 0" class="ml-1 text-green-400/70">(<span x-text="availableModels.length"></span> models found)</span>
           </p>
+          <!-- Inline pricing for selected model -->
+          <template x-if="getModelPrice(settingsForm.ai_model || getDefaultModel(settingsForm.ai_provider))">
+            <p class="text-xs mt-1.5">
+              <span class="text-amber-400/80" x-text="'$' + getModelPrice(settingsForm.ai_model || getDefaultModel(settingsForm.ai_provider)).input + '/1M input'"></span>
+              <span class="text-muted/40 mx-1">&middot;</span>
+              <span class="text-amber-400/80" x-text="'$' + getModelPrice(settingsForm.ai_model || getDefaultModel(settingsForm.ai_provider)).output + '/1M output'"></span>
+            </p>
+          </template>
+          <template x-if="(settingsForm.ai_model || getDefaultModel(settingsForm.ai_provider)) && !getModelPrice(settingsForm.ai_model || getDefaultModel(settingsForm.ai_provider))">
+            <p class="text-[11px] text-muted/40 mt-1.5">Pricing unavailable for this model</p>
+          </template>
+        </div>
+
+        <div class="border-t border-border"></div>
+
+        <!-- Pricing Table -->
+        <div>
+          <div class="flex items-center justify-between">
+            <button @click="showPricingTable = !showPricingTable" class="text-xs text-muted hover:text-txt transition-colors flex items-center gap-1">
+              <span x-text="showPricingTable ? '▾' : '▸'"></span> View all pricing
+            </button>
+            <button @click="refreshPricing()" :disabled="refreshingPricing" class="text-[10px] text-muted/60 hover:text-accent transition-colors disabled:opacity-30 flex items-center gap-1">
+              <span x-show="!refreshingPricing">↻ Update via AI</span>
+              <span x-show="refreshingPricing">Updating...</span>
+            </button>
+          </div>
+          <div x-show="showPricingTable" x-transition class="mt-2 rounded-lg border border-border overflow-hidden">
+            <table class="w-full text-[11px]">
+              <thead>
+                <tr class="bg-surface2/80 text-muted">
+                  <th class="text-left px-2.5 py-1.5 font-medium">Model</th>
+                  <th class="text-right px-2.5 py-1.5 font-medium">Input/1M</th>
+                  <th class="text-right px-2.5 py-1.5 font-medium">Output/1M</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="row in getProviderPricing(settingsForm.ai_provider)" :key="row.model">
+                  <tr class="border-t border-border/50 hover:bg-surface2/30">
+                    <td class="px-2.5 py-1.5 text-txt font-mono" x-text="row.model"></td>
+                    <td class="text-right px-2.5 py-1.5 text-amber-400/80" x-text="'$' + row.input"></td>
+                    <td class="text-right px-2.5 py-1.5 text-amber-400/80" x-text="'$' + row.output"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+            <div class="px-2.5 py-1.5 bg-surface2/40 text-[10px] text-muted/50 border-t border-border/50">
+              Prices per 1M tokens. <span x-text="pricingLastUpdated ? 'Updated: ' + pricingLastUpdated : 'Default pricing data'"></span>
+            </div>
+          </div>
         </div>
       </div>
       <div class="px-5 py-3 border-t border-border flex justify-end gap-2">
@@ -591,6 +640,32 @@
         availableModels: [],
         fetchingModels: false,
         _keyRevision: 0,
+        showPricingTable: false,
+        refreshingPricing: false,
+        pricingLastUpdated: null,
+        modelPricing: {},
+        _defaultPricing: {
+          'gemini-2.0-flash': { provider: 'gemini', input: '0.10', output: '0.40' },
+          'gemini-2.5-flash': { provider: 'gemini', input: '0.30', output: '2.50' },
+          'gemini-2.5-flash-lite': { provider: 'gemini', input: '0.10', output: '0.40' },
+          'gemini-2.5-pro': { provider: 'gemini', input: '1.25', output: '10.00' },
+          'gemini-3-pro': { provider: 'gemini', input: '2.00', output: '12.00' },
+          'gemini-3-flash': { provider: 'gemini', input: '0.50', output: '3.00' },
+          'gpt-4o': { provider: 'openai', input: '2.50', output: '10.00' },
+          'gpt-4o-mini': { provider: 'openai', input: '0.15', output: '0.60' },
+          'gpt-4.1': { provider: 'openai', input: '2.00', output: '8.00' },
+          'gpt-4.1-mini': { provider: 'openai', input: '0.40', output: '1.60' },
+          'gpt-4.1-nano': { provider: 'openai', input: '0.10', output: '0.40' },
+          'o3': { provider: 'openai', input: '2.00', output: '8.00' },
+          'o3-mini': { provider: 'openai', input: '1.10', output: '4.40' },
+          'o4-mini': { provider: 'openai', input: '1.10', output: '4.40' },
+          'gpt-5-mini': { provider: 'openai', input: '0.15', output: '0.60' },
+          'claude-opus-4-6': { provider: 'anthropic', input: '5.00', output: '25.00' },
+          'claude-sonnet-4-6': { provider: 'anthropic', input: '3.00', output: '15.00' },
+          'claude-haiku-4-5': { provider: 'anthropic', input: '1.00', output: '5.00' },
+          'claude-sonnet-4-0': { provider: 'anthropic', input: '3.00', output: '15.00' },
+          'claude-opus-4-0': { provider: 'anthropic', input: '15.00', output: '75.00' },
+        },
         providerList: [
           { key: 'gemini', name: 'Google Gemini', desc: 'Fast, free tier available', icon: '\u2726', color: '#4285f4' },
           { key: 'openai', name: 'OpenAI', desc: 'GPT-4o, compatible with LM Studio/Ollama', icon: '\u25CE', color: '#10a37f' },
@@ -660,10 +735,94 @@
 
         // ---- Lifecycle ----
         async init() {
+          this._loadPricing();
           await this.fetchProjects();
         },
 
         // ---- Helpers ----
+        getDefaultModel(provider) {
+          const defaults = { gemini: 'gemini-2.0-flash', openai: 'gpt-4o-mini', anthropic: 'claude-sonnet-4-6' };
+          return defaults[provider] || '';
+        },
+
+        getModelPrice(modelId) {
+          if (!modelId) return null;
+          const pricing = this.modelPricing;
+          // Direct match
+          if (pricing[modelId]) return pricing[modelId];
+          // Strip date suffix (e.g. claude-sonnet-4-6-20250514 → claude-sonnet-4-6)
+          const stripped = modelId.replace(/-\d{8}$/, '');
+          if (pricing[stripped]) return pricing[stripped];
+          // Partial match: find key that starts with modelId or vice versa
+          for (const key of Object.keys(pricing)) {
+            if (modelId.startsWith(key) || key.startsWith(modelId)) return pricing[key];
+          }
+          return null;
+        },
+
+        getProviderPricing(provider) {
+          return Object.entries(this.modelPricing)
+            .filter(([, v]) => v.provider === provider)
+            .map(([model, v]) => ({ model, input: v.input, output: v.output }))
+            .sort((a, b) => parseFloat(a.input) - parseFloat(b.input));
+        },
+
+        _loadPricing() {
+          const saved = localStorage.getItem('tasker_model_pricing');
+          if (saved) {
+            try {
+              const parsed = JSON.parse(saved);
+              this.modelPricing = parsed.data || this._defaultPricing;
+              this.pricingLastUpdated = parsed.updated || null;
+              return;
+            } catch {}
+          }
+          this.modelPricing = { ...this._defaultPricing };
+        },
+
+        async refreshPricing() {
+          // Find any configured provider to use for the AI call
+          const providers = ['gemini', 'openai', 'anthropic'];
+          let useProvider = null;
+          let useKey = null;
+          for (const p of providers) {
+            const k = localStorage.getItem('tasker_ai_key_' + p);
+            if (k) { useProvider = p; useKey = k; break; }
+          }
+          if (!useProvider) {
+            this.showToast('No API key configured — set up a provider first', 'error');
+            return;
+          }
+          this.refreshingPricing = true;
+          try {
+            const res = await fetch('/api/ai/pricing', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ provider: useProvider, api_key: useKey }),
+            });
+            if (!res.ok) throw new Error('Failed to fetch pricing');
+            const data = await res.json();
+            if (data.pricing && Object.keys(data.pricing).length > 0) {
+              // Merge with defaults to preserve provider info
+              const merged = { ...this._defaultPricing };
+              for (const [model, prices] of Object.entries(data.pricing)) {
+                merged[model] = { ...prices };
+              }
+              this.modelPricing = merged;
+              const updated = new Date().toLocaleDateString();
+              this.pricingLastUpdated = updated;
+              localStorage.setItem('tasker_model_pricing', JSON.stringify({ data: merged, updated }));
+              this.showToast('Pricing updated');
+            } else {
+              this.showToast('AI returned no pricing data', 'error');
+            }
+          } catch (err) {
+            this.showToast(err.message || 'Failed to update pricing', 'error');
+          } finally {
+            this.refreshingPricing = false;
+          }
+        },
+
         isProviderConfigured(providerKey) {
           this._keyRevision; // reactive dependency — forces Alpine to re-evaluate when keys change
           return !!localStorage.getItem('tasker_ai_key_' + providerKey);
