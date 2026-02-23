@@ -1184,7 +1184,14 @@
               const data = await res.json();
               models = (data.data || []).map(m => m.id).sort();
             } else if (provider === 'anthropic') {
-              models = ['claude-opus-4-20250514', 'claude-sonnet-4-20250514', 'claude-haiku-4-5-20251001'];
+              const res = await fetch('/api/ai/models', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ provider: 'anthropic', api_key: key, base_url: baseUrl || undefined }),
+              });
+              if (!res.ok) throw new Error('Failed to fetch models');
+              const data = await res.json();
+              models = data.models || [];
             }
 
             this.availableModels = models;

@@ -80,6 +80,38 @@ function getEnvKey(provider) {
   return process.env[map[provider]] || null;
 }
 
+// ── Models Endpoint ──
+
+router.post('/models', async (req, res) => {
+  try {
+    const { provider, api_key, base_url } = req.body;
+    if (!provider) return res.status(400).json({ error: 'provider is required' });
+    if (!api_key) return res.status(400).json({ error: 'api_key is required' });
+
+    if (provider === 'anthropic') {
+      const url = (base_url || 'https://api.anthropic.com') + '/v1/models';
+      const response = await fetch(url, {
+        headers: {
+          'x-api-key': api_key,
+          'anthropic-version': '2023-06-01',
+        },
+      });
+      if (!response.ok) {
+        const err = await response.text();
+        throw new Error(`Anthropic API error ${response.status}: ${err.slice(0, 200)}`);
+      }
+      const data = await response.json();
+      const models = (data.data || []).map(m => m.id).sort();
+      return res.json({ models });
+    }
+
+    return res.status(400).json({ error: `No server-side model listing needed for ${provider}` });
+  } catch (err) {
+    console.error('Error fetching models:', err);
+    res.status(500).json({ error: err.message || 'Failed to fetch models' });
+  }
+});
+
 // ── Breakdown Endpoint ──
 
 router.post('/breakdown', async (req, res) => {
