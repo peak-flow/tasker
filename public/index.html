@@ -464,147 +464,214 @@
 
   <!-- ==================== SETTINGS MODAL ==================== -->
   <div x-show="showSettings" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" @keydown.escape.window="showSettings && closeSettings()">
-    <div class="bg-surface rounded-lg border border-border shadow-2xl w-[480px] max-w-[90vw] max-h-[80vh] flex flex-col" @click.outside="closeSettings()">
+    <div class="bg-surface rounded-lg border border-border shadow-2xl w-[620px] max-w-[92vw] max-h-[80vh] flex flex-col" @click.outside="closeSettings()">
+      <!-- Header -->
       <div class="px-5 py-4 border-b border-border flex items-center justify-between">
         <h3 class="text-sm font-medium text-txt">AI Settings</h3>
         <button @click="closeSettings()" class="p-1 rounded hover:bg-surface2 text-muted hover:text-txt">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
       </div>
-      <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-        <!-- Provider Cards -->
-        <div>
-          <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-2">Provider</label>
-          <div class="flex flex-col gap-2">
-            <template x-for="prov in providerList" :key="prov.key">
-              <div class="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all border"
-                :class="settingsForm.ai_provider === prov.key
-                  ? 'border-accent bg-accent/10'
-                  : 'border-border bg-surface2/50 hover:border-accent/40'"
-                @click="settingsForm.ai_provider = prov.key; onProviderChange()">
-                <span class="w-8 h-8 rounded-lg flex items-center justify-center text-sm flex-shrink-0"
-                  :style="'background:' + prov.color + '20;color:' + prov.color" x-text="prov.icon"></span>
-                <div class="flex-1 min-w-0">
-                  <div class="text-sm font-medium text-txt" x-text="prov.name"></div>
-                  <div class="text-[11px] text-muted truncate" x-text="prov.desc"></div>
+      <!-- Body: sidebar + content -->
+      <div class="flex flex-1 overflow-hidden">
+        <!-- Sidebar Nav -->
+        <div class="w-[140px] border-r border-border p-2 flex-shrink-0">
+          <button @click="settingsTab = 'model'" class="w-full flex items-center gap-2 px-3 py-2 rounded-md text-xs transition-colors mb-1"
+            :class="settingsTab === 'model' ? 'bg-accent/12 text-accent' : 'text-muted hover:text-txt hover:bg-surface2'">
+            <span class="text-sm">&#9881;</span> Model
+          </button>
+          <button @click="settingsTab = 'pricing'" class="w-full flex items-center gap-2 px-3 py-2 rounded-md text-xs transition-colors mb-1"
+            :class="settingsTab === 'pricing' ? 'bg-accent/12 text-accent' : 'text-muted hover:text-txt hover:bg-surface2'">
+            <span class="text-sm">$</span> Pricing
+          </button>
+          <button @click="settingsTab = 'logs'; fetchAiLogs()" class="w-full flex items-center gap-2 px-3 py-2 rounded-md text-xs transition-colors"
+            :class="settingsTab === 'logs' ? 'bg-accent/12 text-accent' : 'text-muted hover:text-txt hover:bg-surface2'">
+            <span class="text-sm">&#9776;</span> Logs
+          </button>
+        </div>
+        <!-- Content -->
+        <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+
+          <!-- ========== MODEL TAB ========== -->
+          <template x-if="settingsTab === 'model'">
+            <div class="space-y-4">
+              <!-- Provider Cards -->
+              <div>
+                <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-2">Provider</label>
+                <div class="flex flex-col gap-2">
+                  <template x-for="prov in providerList" :key="prov.key">
+                    <div class="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all border"
+                      :class="settingsForm.ai_provider === prov.key
+                        ? 'border-accent bg-accent/10'
+                        : 'border-border bg-surface2/50 hover:border-accent/40'"
+                      @click="settingsForm.ai_provider = prov.key; onProviderChange()">
+                      <span class="w-8 h-8 rounded-lg flex items-center justify-center text-sm flex-shrink-0"
+                        :style="'background:' + prov.color + '20;color:' + prov.color" x-text="prov.icon"></span>
+                      <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium text-txt" x-text="prov.name"></div>
+                        <div class="text-[11px] text-muted truncate" x-text="prov.desc"></div>
+                      </div>
+                      <span class="text-[10px] px-2 py-0.5 rounded-full flex-shrink-0"
+                        :class="isProviderConfigured(prov.key)
+                          ? 'bg-green-500/15 text-green-400'
+                          : 'bg-surface2 text-muted/60'"
+                        x-text="isProviderConfigured(prov.key) ? 'Ready' : 'Not set up'"></span>
+                    </div>
+                  </template>
                 </div>
-                <span class="text-[10px] px-2 py-0.5 rounded-full flex-shrink-0"
-                  :class="isProviderConfigured(prov.key)
-                    ? 'bg-green-500/15 text-green-400'
-                    : 'bg-surface2 text-muted/60'"
-                  x-text="isProviderConfigured(prov.key) ? 'Ready' : 'Not set up'"></span>
               </div>
-            </template>
-          </div>
-        </div>
 
-        <div class="border-t border-border"></div>
+              <div class="border-t border-border"></div>
 
-        <!-- API Key -->
-        <div>
-          <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-1.5">API Key</label>
-          <div class="flex gap-2">
-            <input type="password" x-model="settingsForm.ai_api_key"
-              placeholder="Enter API key"
-              class="flex-1 bg-surface2 text-txt text-sm px-3 py-2 rounded-md border border-border focus:border-accent focus:outline-none placeholder-muted/40">
-            <button @click="fetchModels()" :disabled="fetchingModels || !settingsForm.ai_api_key.trim()"
-              class="px-3 py-2 text-xs bg-surface2 text-muted hover:text-txt border border-border rounded-md hover:border-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors whitespace-nowrap">
-              <span x-show="!fetchingModels">Fetch Models</span>
-              <span x-show="fetchingModels">Loading...</span>
-            </button>
-          </div>
-          <div class="flex items-center gap-1.5 mt-1.5">
-            <span class="w-1.5 h-1.5 rounded-full flex-shrink-0"
-              :class="isProviderConfigured(settingsForm.ai_provider) ? 'bg-green-400' : 'bg-red-400'"></span>
-            <span class="text-[11px]"
-              :class="isProviderConfigured(settingsForm.ai_provider) ? 'text-green-400/70' : 'text-red-400/70'"
-              x-text="isProviderConfigured(settingsForm.ai_provider) ? 'API key saved in browser' : 'No API key set'"></span>
-          </div>
-        </div>
+              <!-- API Key -->
+              <div>
+                <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-1.5">API Key</label>
+                <div class="flex gap-2">
+                  <input type="password" x-model="settingsForm.ai_api_key"
+                    placeholder="Enter API key"
+                    class="flex-1 bg-surface2 text-txt text-sm px-3 py-2 rounded-md border border-border focus:border-accent focus:outline-none placeholder-muted/40">
+                  <button @click="fetchModels()" :disabled="fetchingModels || !settingsForm.ai_api_key.trim()"
+                    class="px-3 py-2 text-xs bg-surface2 text-muted hover:text-txt border border-border rounded-md hover:border-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors whitespace-nowrap">
+                    <span x-show="!fetchingModels">Fetch Models</span>
+                    <span x-show="fetchingModels">Loading...</span>
+                  </button>
+                </div>
+                <div class="flex items-center gap-1.5 mt-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                    :class="isProviderConfigured(settingsForm.ai_provider) ? 'bg-green-400' : 'bg-red-400'"></span>
+                  <span class="text-[11px]"
+                    :class="isProviderConfigured(settingsForm.ai_provider) ? 'text-green-400/70' : 'text-red-400/70'"
+                    x-text="isProviderConfigured(settingsForm.ai_provider) ? 'API key saved in browser' : 'No API key set'"></span>
+                </div>
+              </div>
 
-        <!-- Base URL -->
-        <div>
-          <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-1.5">API Base URL <span class="normal-case text-muted/60">(optional, for custom endpoints)</span></label>
-          <input type="text" x-model="settingsForm.ai_base_url"
-            :placeholder="settingsForm.ai_provider === 'openai' ? 'https://api.openai.com/v1' : settingsForm.ai_provider === 'anthropic' ? 'https://api.anthropic.com' : 'https://generativelanguage.googleapis.com/v1beta'"
-            class="w-full bg-surface2 text-txt text-sm px-3 py-2 rounded-md border border-border focus:border-accent focus:outline-none placeholder-muted/40">
-          <p class="text-xs text-muted/60 mt-1">Leave blank for default. Use custom URL for LM Studio, Ollama, etc.</p>
-        </div>
+              <!-- Base URL -->
+              <div>
+                <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-1.5">API Base URL <span class="normal-case text-muted/60">(optional, for custom endpoints)</span></label>
+                <input type="text" x-model="settingsForm.ai_base_url"
+                  :placeholder="settingsForm.ai_provider === 'openai' ? 'https://api.openai.com/v1' : settingsForm.ai_provider === 'anthropic' ? 'https://api.anthropic.com' : 'https://generativelanguage.googleapis.com/v1beta'"
+                  class="w-full bg-surface2 text-txt text-sm px-3 py-2 rounded-md border border-border focus:border-accent focus:outline-none placeholder-muted/40">
+                <p class="text-xs text-muted/60 mt-1">Leave blank for default. Use custom URL for LM Studio, Ollama, etc.</p>
+              </div>
 
-        <!-- Model -->
-        <div>
-          <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-1.5">Model</label>
-          <template x-if="availableModels.length > 0">
-            <div>
-              <select x-model="settingsForm.ai_model" class="w-full bg-surface2 text-txt text-sm px-3 py-2 rounded-md border border-border focus:border-accent focus:outline-none">
-                <option value="">Use default</option>
-                <template x-for="m in availableModels" :key="m">
-                  <option :value="m" x-text="m"></option>
+              <!-- Model -->
+              <div>
+                <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-1.5">Model</label>
+                <template x-if="availableModels.length > 0">
+                  <div>
+                    <select x-model="settingsForm.ai_model" class="w-full bg-surface2 text-txt text-sm px-3 py-2 rounded-md border border-border focus:border-accent focus:outline-none">
+                      <option value="">Use default</option>
+                      <template x-for="m in availableModels" :key="m">
+                        <option :value="m" x-text="m"></option>
+                      </template>
+                    </select>
+                  </div>
                 </template>
-              </select>
+                <template x-if="availableModels.length === 0">
+                  <input type="text" x-model="settingsForm.ai_model" placeholder="Leave blank for default"
+                    class="w-full bg-surface2 text-txt text-sm px-3 py-2 rounded-md border border-border focus:border-accent focus:outline-none placeholder-muted/40">
+                </template>
+                <p class="text-xs text-muted/60 mt-1">
+                  <span x-show="settingsForm.ai_provider === 'gemini'">Default: gemini-2.0-flash</span>
+                  <span x-show="settingsForm.ai_provider === 'openai'">Default: gpt-4o-mini</span>
+                  <span x-show="settingsForm.ai_provider === 'anthropic'">Default: claude-sonnet-4-20250514</span>
+                  <span x-show="availableModels.length > 0" class="ml-1 text-green-400/70">(<span x-text="availableModels.length"></span> models found)</span>
+                </p>
+                <!-- Inline pricing for selected model -->
+                <template x-if="getModelPrice(settingsForm.ai_model || getDefaultModel(settingsForm.ai_provider))">
+                  <p class="text-xs mt-1.5">
+                    <span class="text-amber-400/80" x-text="'$' + getModelPrice(settingsForm.ai_model || getDefaultModel(settingsForm.ai_provider)).input + '/1M input'"></span>
+                    <span class="text-muted/40 mx-1">&middot;</span>
+                    <span class="text-amber-400/80" x-text="'$' + getModelPrice(settingsForm.ai_model || getDefaultModel(settingsForm.ai_provider)).output + '/1M output'"></span>
+                  </p>
+                </template>
+                <template x-if="(settingsForm.ai_model || getDefaultModel(settingsForm.ai_provider)) && !getModelPrice(settingsForm.ai_model || getDefaultModel(settingsForm.ai_provider))">
+                  <p class="text-[11px] text-muted/40 mt-1.5">Pricing unavailable for this model</p>
+                </template>
+              </div>
             </div>
           </template>
-          <template x-if="availableModels.length === 0">
-            <input type="text" x-model="settingsForm.ai_model" placeholder="Leave blank for default"
-              class="w-full bg-surface2 text-txt text-sm px-3 py-2 rounded-md border border-border focus:border-accent focus:outline-none placeholder-muted/40">
-          </template>
-          <p class="text-xs text-muted/60 mt-1">
-            <span x-show="settingsForm.ai_provider === 'gemini'">Default: gemini-2.0-flash</span>
-            <span x-show="settingsForm.ai_provider === 'openai'">Default: gpt-4o-mini</span>
-            <span x-show="settingsForm.ai_provider === 'anthropic'">Default: claude-sonnet-4-20250514</span>
-            <span x-show="availableModels.length > 0" class="ml-1 text-green-400/70">(<span x-text="availableModels.length"></span> models found)</span>
-          </p>
-          <!-- Inline pricing for selected model -->
-          <template x-if="getModelPrice(settingsForm.ai_model || getDefaultModel(settingsForm.ai_provider))">
-            <p class="text-xs mt-1.5">
-              <span class="text-amber-400/80" x-text="'$' + getModelPrice(settingsForm.ai_model || getDefaultModel(settingsForm.ai_provider)).input + '/1M input'"></span>
-              <span class="text-muted/40 mx-1">&middot;</span>
-              <span class="text-amber-400/80" x-text="'$' + getModelPrice(settingsForm.ai_model || getDefaultModel(settingsForm.ai_provider)).output + '/1M output'"></span>
-            </p>
-          </template>
-          <template x-if="(settingsForm.ai_model || getDefaultModel(settingsForm.ai_provider)) && !getModelPrice(settingsForm.ai_model || getDefaultModel(settingsForm.ai_provider))">
-            <p class="text-[11px] text-muted/40 mt-1.5">Pricing unavailable for this model</p>
-          </template>
-        </div>
 
-        <div class="border-t border-border"></div>
-
-        <!-- Pricing Table -->
-        <div>
-          <div class="flex items-center justify-between">
-            <button @click="showPricingTable = !showPricingTable" class="text-xs text-muted hover:text-txt transition-colors flex items-center gap-1">
-              <span x-text="showPricingTable ? '▾' : '▸'"></span> View all pricing
-            </button>
-            <button @click="refreshPricing()" :disabled="refreshingPricing" class="text-[10px] text-muted/60 hover:text-accent transition-colors disabled:opacity-30 flex items-center gap-1">
-              <span x-show="!refreshingPricing">↻ Update via AI</span>
-              <span x-show="refreshingPricing">Updating...</span>
-            </button>
-          </div>
-          <div x-show="showPricingTable" x-transition class="mt-2 rounded-lg border border-border overflow-hidden">
-            <table class="w-full text-[11px]">
-              <thead>
-                <tr class="bg-surface2/80 text-muted">
-                  <th class="text-left px-2.5 py-1.5 font-medium">Model</th>
-                  <th class="text-right px-2.5 py-1.5 font-medium">Input/1M</th>
-                  <th class="text-right px-2.5 py-1.5 font-medium">Output/1M</th>
-                </tr>
-              </thead>
-              <tbody>
-                <template x-for="row in getProviderPricing(settingsForm.ai_provider)" :key="row.model">
-                  <tr class="border-t border-border/50 hover:bg-surface2/30">
-                    <td class="px-2.5 py-1.5 text-txt font-mono" x-text="row.model"></td>
-                    <td class="text-right px-2.5 py-1.5 text-amber-400/80" x-text="'$' + row.input"></td>
-                    <td class="text-right px-2.5 py-1.5 text-amber-400/80" x-text="'$' + row.output"></td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-            <div class="px-2.5 py-1.5 bg-surface2/40 text-[10px] text-muted/50 border-t border-border/50">
-              Prices per 1M tokens. <span x-text="pricingLastUpdated ? 'Updated: ' + pricingLastUpdated : 'Default pricing data'"></span>
+          <!-- ========== PRICING TAB ========== -->
+          <template x-if="settingsTab === 'pricing'">
+            <div class="space-y-4">
+              <div class="flex items-center justify-between">
+                <label class="text-xs uppercase tracking-wider text-muted font-medium">Pricing &mdash; <span class="normal-case" x-text="providerList.find(p => p.key === settingsForm.ai_provider)?.name || settingsForm.ai_provider"></span></label>
+                <button @click="refreshPricing()" :disabled="refreshingPricing" class="text-[10px] text-muted/60 hover:text-accent transition-colors disabled:opacity-30 flex items-center gap-1">
+                  <span x-show="!refreshingPricing">↻ Refresh from official pages</span>
+                  <span x-show="refreshingPricing">Fetching pricing pages...</span>
+                </button>
+              </div>
+              <div class="rounded-lg border border-border overflow-hidden">
+                <table class="w-full text-[11px]">
+                  <thead>
+                    <tr class="bg-surface2/80 text-muted">
+                      <th class="text-left px-2.5 py-1.5 font-medium">Model</th>
+                      <th class="text-right px-2.5 py-1.5 font-medium">Input / 1M tokens</th>
+                      <th class="text-right px-2.5 py-1.5 font-medium">Output / 1M tokens</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="row in getProviderPricing(settingsForm.ai_provider)" :key="row.model">
+                      <tr class="border-t border-border/50 hover:bg-surface2/30">
+                        <td class="px-2.5 py-1.5 text-txt font-mono text-[11px]" x-text="row.model"></td>
+                        <td class="text-right px-2.5 py-1.5 text-amber-400/80" x-text="'$' + row.input"></td>
+                        <td class="text-right px-2.5 py-1.5 text-amber-400/80" x-text="'$' + row.output"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+                <div class="px-2.5 py-1.5 bg-surface2/40 text-[10px] text-muted/50 border-t border-border/50">
+                  Prices per 1M tokens. <span x-text="pricingLastUpdated ? 'Updated: ' + pricingLastUpdated : 'Default pricing data'"></span>
+                </div>
+              </div>
+              <p class="text-[11px] text-muted/50">Switch provider on the Model tab to see other providers' pricing.</p>
             </div>
-          </div>
+          </template>
+
+          <!-- ========== LOGS TAB ========== -->
+          <template x-if="settingsTab === 'logs'">
+            <div class="space-y-4">
+              <div class="flex items-center justify-between">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" :checked="aiLogging" @change="toggleAiLogging()"
+                    class="w-3.5 h-3.5 rounded border-border bg-surface2 accent-accent">
+                  <span class="text-xs text-muted">Log AI calls</span>
+                </label>
+                <div class="flex items-center gap-3">
+                  <button @click="fetchAiLogs()" class="text-[10px] text-muted/60 hover:text-accent transition-colors">Refresh</button>
+                  <button @click="clearAiLogs()" class="text-[10px] text-red-400/60 hover:text-red-400 transition-colors">Clear all</button>
+                </div>
+              </div>
+              <div x-show="aiLogs.length === 0" class="text-center py-8">
+                <p class="text-sm text-muted/50">No log entries</p>
+                <p class="text-[11px] text-muted/30 mt-1" x-show="!aiLogging">Enable logging above to start recording AI calls</p>
+              </div>
+              <div x-show="aiLogs.length > 0" class="rounded-lg border border-border overflow-hidden max-h-[340px] overflow-y-auto">
+                <template x-for="log in aiLogs" :key="log.id">
+                  <div class="px-3 py-2.5 border-b border-border/50 text-[11px]">
+                    <div class="flex items-center justify-between text-muted/60 mb-1.5">
+                      <span x-text="log.provider + ' · ' + (log.model || 'default') + ' · ' + log.endpoint"></span>
+                      <span :class="log.error ? 'text-red-400' : 'text-muted/50'" x-text="log.error ? 'ERR' : log.duration_ms + 'ms'"></span>
+                    </div>
+                    <details>
+                      <summary class="text-muted hover:text-txt cursor-pointer">Prompt <span class="text-muted/40" x-text="'(' + log.prompt.length + ' chars)'"></span></summary>
+                      <pre class="mt-1 p-2 bg-surface2/50 rounded text-[10px] text-txt/80 whitespace-pre-wrap max-h-32 overflow-y-auto" x-text="log.prompt"></pre>
+                    </details>
+                    <details class="mt-1" x-show="log.response">
+                      <summary class="text-green-400/70 hover:text-green-400 cursor-pointer">Response <span class="text-muted/40" x-text="'(' + (log.response || '').length + ' chars)'"></span></summary>
+                      <pre class="mt-1 p-2 bg-surface2/50 rounded text-[10px] text-txt/80 whitespace-pre-wrap max-h-32 overflow-y-auto" x-text="log.response"></pre>
+                    </details>
+                    <div x-show="log.error" class="mt-1 text-red-400/80 text-[10px]" x-text="log.error"></div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+
         </div>
       </div>
+      <!-- Footer -->
       <div class="px-5 py-3 border-t border-border flex justify-end gap-2">
         <button @click="closeSettings()" class="px-4 py-2 text-sm text-muted hover:text-txt hover:bg-surface2 rounded-md transition-colors">Cancel</button>
         <button @click="saveSettings()" :disabled="settingsSaving"
@@ -635,6 +702,7 @@
 
         // Settings state
         showSettings: false,
+        settingsTab: 'model',
         settingsForm: { ai_provider: 'gemini', ai_base_url: '', ai_model: '', ai_api_key: '' },
         settingsSaving: false,
         availableModels: [],
@@ -642,6 +710,9 @@
         _keyRevision: 0,
         showPricingTable: false,
         refreshingPricing: false,
+        aiLogging: localStorage.getItem('tasker_ai_logging') === 'true',
+        aiLogs: [],
+        showAiLogs: false,
         pricingLastUpdated: null,
         modelPricing: {},
         _defaultPricing: {
@@ -781,45 +852,93 @@
         },
 
         async refreshPricing() {
-          // Find any configured provider to use for the AI call
-          const providers = ['gemini', 'openai', 'anthropic'];
-          let useProvider = null;
-          let useKey = null;
-          for (const p of providers) {
+          // Collect all configured providers
+          const configured = [];
+          for (const p of ['gemini', 'openai', 'anthropic']) {
             const k = localStorage.getItem('tasker_ai_key_' + p);
-            if (k) { useProvider = p; useKey = k; break; }
+            if (k) configured.push({ provider: p, api_key: k });
           }
-          if (!useProvider) {
+          if (configured.length === 0) {
             this.showToast('No API key configured — set up a provider first', 'error');
             return;
           }
+          // Use cheapest provider (gemini first) as the AI parser
+          const aiParsers = configured.sort((a, b) => {
+            const order = { gemini: 0, openai: 1, anthropic: 2 };
+            return (order[a.provider] ?? 9) - (order[b.provider] ?? 9);
+          });
+          const aiParser = aiParsers[0];
+
           this.refreshingPricing = true;
+          const allPricing = {};
+          let totalModels = 0;
+          const enableLogging = localStorage.getItem('tasker_ai_logging') === 'true';
           try {
-            const res = await fetch('/api/ai/pricing', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ provider: useProvider, api_key: useKey }),
-            });
-            if (!res.ok) throw new Error('Failed to fetch pricing');
-            const data = await res.json();
-            if (data.pricing && Object.keys(data.pricing).length > 0) {
-              // Merge with defaults to preserve provider info
-              const merged = { ...this._defaultPricing };
-              for (const [model, prices] of Object.entries(data.pricing)) {
-                merged[model] = { ...prices };
+            for (const { provider, api_key } of configured) {
+              try {
+                const res = await fetch('/api/ai/pricing/refresh', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    provider, api_key,
+                    ai_provider: aiParser.provider,
+                    ai_api_key: aiParser.api_key,
+                    enable_logging: enableLogging,
+                  }),
+                });
+                if (!res.ok) {
+                  const err = await res.json().catch(() => ({}));
+                  console.warn(`Pricing refresh failed for ${provider}:`, err.error);
+                  continue;
+                }
+                const data = await res.json();
+                if (data.pricing) {
+                  Object.assign(allPricing, data.pricing);
+                  totalModels += data.models_priced || 0;
+                }
+              } catch (err) {
+                console.warn(`Pricing refresh error for ${provider}:`, err.message);
               }
-              this.modelPricing = merged;
+            }
+            if (Object.keys(allPricing).length > 0) {
+              this.modelPricing = allPricing;
               const updated = new Date().toLocaleDateString();
               this.pricingLastUpdated = updated;
-              localStorage.setItem('tasker_model_pricing', JSON.stringify({ data: merged, updated }));
-              this.showToast('Pricing updated');
+              localStorage.setItem('tasker_model_pricing', JSON.stringify({ data: allPricing, updated }));
+              this.showToast(`Pricing updated: ${totalModels} models from ${configured.length} provider(s)`);
             } else {
-              this.showToast('AI returned no pricing data', 'error');
+              this.showToast('No pricing data extracted', 'error');
             }
           } catch (err) {
             this.showToast(err.message || 'Failed to update pricing', 'error');
           } finally {
             this.refreshingPricing = false;
+          }
+        },
+
+        toggleAiLogging() {
+          this.aiLogging = !this.aiLogging;
+          localStorage.setItem('tasker_ai_logging', this.aiLogging ? 'true' : 'false');
+        },
+
+        async fetchAiLogs() {
+          try {
+            const res = await fetch('/api/ai/logs?limit=50');
+            if (!res.ok) throw new Error('Failed to fetch logs');
+            this.aiLogs = await res.json();
+            this.showAiLogs = true;
+          } catch (err) {
+            this.showToast('Failed to load logs', 'error');
+          }
+        },
+
+        async clearAiLogs() {
+          try {
+            await fetch('/api/ai/logs', { method: 'DELETE' });
+            this.aiLogs = [];
+            this.showToast('Logs cleared');
+          } catch (err) {
+            this.showToast('Failed to clear logs', 'error');
           }
         },
 
@@ -1116,6 +1235,7 @@
                 context: context || undefined,
                 provider: localStorage.getItem('tasker_active_provider') || 'gemini',
                 api_key: localStorage.getItem('tasker_ai_key_' + (localStorage.getItem('tasker_active_provider') || 'gemini')) || undefined,
+                enable_logging: localStorage.getItem('tasker_ai_logging') === 'true',
               }),
             });
             if (!res.ok) {
@@ -1376,6 +1496,7 @@
 
         async openSettings() {
           this.showSettings = true;
+          this.settingsTab = 'model';
           this.availableModels = [];
           this._keyRevision++; // force badge re-evaluation from localStorage
           try {
