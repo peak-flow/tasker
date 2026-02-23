@@ -84,16 +84,16 @@ function getEnvKey(provider) {
 
 router.post('/breakdown', async (req, res) => {
   try {
-    const { task_label, context, api_key } = req.body;
+    const { task_label, context, api_key, provider: reqProvider } = req.body;
     if (!task_label) return res.status(400).json({ error: 'task_label is required' });
 
-    // Load settings from DB (provider, url, model only — no secrets)
-    const { rows } = await pool.query('SELECT ai_provider, ai_base_url, ai_model FROM settings WHERE id = 1');
-    const settings = rows[0] || {};
-
-    const provider = settings.ai_provider || 'gemini';
+    const provider = reqProvider || 'gemini';
     const callFn = PROVIDERS[provider];
     if (!callFn) return res.status(400).json({ error: `Unknown provider: ${provider}` });
+
+    // Load provider config from DB (url, model — no secrets)
+    const { rows } = await pool.query('SELECT base_url, model FROM provider_configs WHERE provider = $1', [provider]);
+    const config = rows[0] || {};
 
     // API key: request body (from localStorage) > env var fallback
     const apiKey = api_key || getEnvKey(provider);
@@ -113,8 +113,8 @@ Example: ["Set up project structure", "Create database schema", "Build API endpo
     const text = await callFn({
       prompt,
       apiKey,
-      baseUrl: settings.ai_base_url,
-      model: settings.ai_model,
+      baseUrl: config.base_url,
+      model: config.model,
     });
 
     // Extract JSON array from response (handle markdown code blocks)

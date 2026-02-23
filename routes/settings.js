@@ -2,33 +2,35 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db/pool');
 
-// GET /api/settings - return current settings (no secrets stored)
+// GET /api/settings - return all provider configs
 router.get('/', async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT ai_provider, ai_base_url, ai_model FROM settings WHERE id = 1');
-    if (rows.length === 0) {
-      return res.json({ ai_provider: 'gemini', ai_base_url: null, ai_model: null });
+    const { rows } = await pool.query('SELECT provider, base_url, model FROM provider_configs ORDER BY provider');
+    // Return as a map: { gemini: { base_url, model }, openai: {...}, ... }
+    const configs = {};
+    for (const row of rows) {
+      configs[row.provider] = { base_url: row.base_url, model: row.model };
     }
-    res.json(rows[0]);
+    res.json(configs);
   } catch (err) {
     console.error('Error fetching settings:', err);
     res.status(500).json({ error: 'Failed to fetch settings' });
   }
 });
 
-// PUT /api/settings - update provider, url, model
-router.put('/', async (req, res) => {
+// PUT /api/settings/:provider - upsert a single provider's config
+router.put('/:provider', async (req, res) => {
   try {
-    const { ai_provider, ai_base_url, ai_model } = req.body;
+    const { provider } = req.params;
+    const { base_url, model } = req.body;
     await pool.query(
-      `INSERT INTO settings (id, ai_provider, ai_base_url, ai_model, updated_at)
-       VALUES (1, $1, $2, $3, NOW())
-       ON CONFLICT (id) DO UPDATE SET
-         ai_provider = $1, ai_base_url = $2, ai_model = $3, updated_at = NOW()`,
-      [ai_provider || 'gemini', ai_base_url || null, ai_model || null]
+      `INSERT INTO provider_configs (provider, base_url, model, updated_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (provider) DO UPDATE SET
+         base_url = $2, model = $3, updated_at = NOW()`,
+      [provider, base_url || null, model || null]
     );
-    const { rows } = await pool.query('SELECT ai_provider, ai_base_url, ai_model FROM settings WHERE id = 1');
-    res.json(rows[0]);
+    res.json({ provider, base_url: base_url || null, model: model || null });
   } catch (err) {
     console.error('Error saving settings:', err);
     res.status(500).json({ error: 'Failed to save settings' });

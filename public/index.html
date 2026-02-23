@@ -474,35 +474,55 @@
       <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4">
         <div>
           <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-1.5">Provider</label>
-          <select x-model="settingsForm.ai_provider" class="w-full bg-surface2 text-txt text-sm px-3 py-2 rounded-md border border-border focus:border-accent focus:outline-none">
+          <select x-model="settingsForm.ai_provider" @change="onProviderChange()" class="w-full bg-surface2 text-txt text-sm px-3 py-2 rounded-md border border-border focus:border-accent focus:outline-none">
             <option value="gemini">Google Gemini</option>
             <option value="openai">OpenAI (or compatible: LM Studio, Ollama, Groq)</option>
             <option value="anthropic">Anthropic Claude</option>
           </select>
         </div>
         <div>
-          <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-1.5">API Base URL <span class="normal-case text-muted/60">(optional, for custom endpoints)</span></label>
-          <input type="text" x-model="settingsForm.ai_base_url"
-            :placeholder="settingsForm.ai_provider === 'openai' ? 'https://api.openai.com/v1 or http://localhost:1234/v1' : settingsForm.ai_provider === 'anthropic' ? 'https://api.anthropic.com' : 'https://generativelanguage.googleapis.com/v1beta'"
-            class="w-full bg-surface2 text-txt text-sm px-3 py-2 rounded-md border border-border focus:border-accent focus:outline-none placeholder-muted/40">
-          <p class="text-xs text-muted/60 mt-1">Leave blank to use the default endpoint for the selected provider.</p>
+          <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-1.5">API Key</label>
+          <div class="flex gap-2">
+            <input type="password" x-model="settingsForm.ai_api_key"
+              placeholder="Enter API key"
+              class="flex-1 bg-surface2 text-txt text-sm px-3 py-2 rounded-md border border-border focus:border-accent focus:outline-none placeholder-muted/40">
+            <button @click="fetchModels()" :disabled="fetchingModels || !settingsForm.ai_api_key.trim()"
+              class="px-3 py-2 text-xs bg-surface2 text-muted hover:text-txt border border-border rounded-md hover:border-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors whitespace-nowrap">
+              <span x-show="!fetchingModels">Fetch Models</span>
+              <span x-show="fetchingModels">Loading...</span>
+            </button>
+          </div>
+          <p class="text-xs text-muted/60 mt-1">Stored in your browser only. Never saved on the server.</p>
         </div>
         <div>
-          <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-1.5">Model <span class="normal-case text-muted/60">(optional)</span></label>
-          <input type="text" x-model="settingsForm.ai_model" placeholder="Leave blank for default"
+          <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-1.5">API Base URL <span class="normal-case text-muted/60">(optional, for custom endpoints)</span></label>
+          <input type="text" x-model="settingsForm.ai_base_url"
+            :placeholder="settingsForm.ai_provider === 'openai' ? 'https://api.openai.com/v1' : settingsForm.ai_provider === 'anthropic' ? 'https://api.anthropic.com' : 'https://generativelanguage.googleapis.com/v1beta'"
             class="w-full bg-surface2 text-txt text-sm px-3 py-2 rounded-md border border-border focus:border-accent focus:outline-none placeholder-muted/40">
+          <p class="text-xs text-muted/60 mt-1">Leave blank for default. Use custom URL for LM Studio, Ollama, etc.</p>
+        </div>
+        <div>
+          <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-1.5">Model</label>
+          <template x-if="availableModels.length > 0">
+            <div>
+              <select x-model="settingsForm.ai_model" class="w-full bg-surface2 text-txt text-sm px-3 py-2 rounded-md border border-border focus:border-accent focus:outline-none">
+                <option value="">Use default</option>
+                <template x-for="m in availableModels" :key="m">
+                  <option :value="m" x-text="m"></option>
+                </template>
+              </select>
+            </div>
+          </template>
+          <template x-if="availableModels.length === 0">
+            <input type="text" x-model="settingsForm.ai_model" placeholder="Leave blank for default"
+              class="w-full bg-surface2 text-txt text-sm px-3 py-2 rounded-md border border-border focus:border-accent focus:outline-none placeholder-muted/40">
+          </template>
           <p class="text-xs text-muted/60 mt-1">
             <span x-show="settingsForm.ai_provider === 'gemini'">Default: gemini-2.0-flash</span>
             <span x-show="settingsForm.ai_provider === 'openai'">Default: gpt-4o-mini</span>
             <span x-show="settingsForm.ai_provider === 'anthropic'">Default: claude-sonnet-4-20250514</span>
+            <span x-show="availableModels.length > 0" class="ml-1 text-green-400/70">(<span x-text="availableModels.length"></span> models found)</span>
           </p>
-        </div>
-        <div>
-          <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-1.5">API Key</label>
-          <input type="password" x-model="settingsForm.ai_api_key"
-            placeholder="Enter API key"
-            class="w-full bg-surface2 text-txt text-sm px-3 py-2 rounded-md border border-border focus:border-accent focus:outline-none placeholder-muted/40">
-          <p class="text-xs text-muted/60 mt-1">Stored in your browser only. Never saved on the server.</p>
         </div>
       </div>
       <div class="px-5 py-3 border-t border-border flex justify-end gap-2">
@@ -537,6 +557,8 @@
         showSettings: false,
         settingsForm: { ai_provider: 'gemini', ai_base_url: '', ai_model: '', ai_api_key: '' },
         settingsSaving: false,
+        availableModels: [],
+        fetchingModels: false,
 
         // Blocker state
         blockerTaskId: null,
@@ -888,7 +910,12 @@
             const res = await fetch('/api/ai/breakdown', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ task_label: item.label, context: context || undefined, api_key: localStorage.getItem('tasker_ai_key') || undefined }),
+              body: JSON.stringify({
+                task_label: item.label,
+                context: context || undefined,
+                provider: localStorage.getItem('tasker_active_provider') || 'gemini',
+                api_key: localStorage.getItem('tasker_ai_key_' + (localStorage.getItem('tasker_active_provider') || 'gemini')) || undefined,
+              }),
             });
             if (!res.ok) {
               const errData = await res.json().catch(() => ({}));
@@ -1076,16 +1103,79 @@
         },
 
         // ---- Settings ----
+        // Provider configs cache (loaded from DB)
+        _providerConfigs: {},
+
+        onProviderChange() {
+          // Load saved config for the new provider
+          const p = this.settingsForm.ai_provider;
+          const saved = this._providerConfigs[p] || {};
+          this.settingsForm.ai_base_url = saved.base_url || '';
+          this.settingsForm.ai_model = saved.model || '';
+          this.settingsForm.ai_api_key = localStorage.getItem('tasker_ai_key_' + p) || '';
+          this.availableModels = [];
+        },
+
+        async fetchModels() {
+          const key = this.settingsForm.ai_api_key.trim();
+          if (!key) return;
+          this.fetchingModels = true;
+          this.availableModels = [];
+          try {
+            const provider = this.settingsForm.ai_provider;
+            const baseUrl = this.settingsForm.ai_base_url.trim();
+            let models = [];
+
+            if (provider === 'gemini') {
+              const url = (baseUrl || 'https://generativelanguage.googleapis.com/v1beta') + '/models?key=' + key;
+              const res = await fetch(url);
+              if (!res.ok) throw new Error('Failed to fetch models');
+              const data = await res.json();
+              models = (data.models || [])
+                .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'))
+                .map(m => m.name.replace('models/', ''));
+            } else if (provider === 'openai') {
+              const url = (baseUrl || 'https://api.openai.com/v1') + '/models';
+              const headers = key ? { 'Authorization': 'Bearer ' + key } : {};
+              const res = await fetch(url, { headers });
+              if (!res.ok) throw new Error('Failed to fetch models');
+              const data = await res.json();
+              models = (data.data || []).map(m => m.id).sort();
+            } else if (provider === 'anthropic') {
+              models = ['claude-opus-4-20250514', 'claude-sonnet-4-20250514', 'claude-haiku-4-5-20251001'];
+            }
+
+            this.availableModels = models;
+            if (models.length > 0) {
+              this.showToast(`Found ${models.length} models`);
+            } else {
+              this.showToast('No models found', 'error');
+            }
+          } catch (err) {
+            this.showToast(err.message || 'Failed to fetch models', 'error');
+          } finally {
+            this.fetchingModels = false;
+          }
+        },
+
         async openSettings() {
           this.showSettings = true;
+          this.availableModels = [];
           try {
+            // Load all provider configs from DB
             const res = await fetch('/api/settings');
             if (!res.ok) throw new Error('fetch failed');
-            const data = await res.json();
-            this.settingsForm.ai_provider = data.ai_provider || 'gemini';
-            this.settingsForm.ai_base_url = data.ai_base_url || '';
-            this.settingsForm.ai_model = data.ai_model || '';
-            this.settingsForm.ai_api_key = localStorage.getItem('tasker_ai_key') || '';
+            this._providerConfigs = await res.json();
+
+            // Load active provider from localStorage
+            const activeProvider = localStorage.getItem('tasker_active_provider') || 'gemini';
+            this.settingsForm.ai_provider = activeProvider;
+
+            // Load that provider's config
+            const saved = this._providerConfigs[activeProvider] || {};
+            this.settingsForm.ai_base_url = saved.base_url || '';
+            this.settingsForm.ai_model = saved.model || '';
+            this.settingsForm.ai_api_key = localStorage.getItem('tasker_ai_key_' + activeProvider) || '';
           } catch (err) {
             this.showToast('Failed to load settings', 'error');
           }
@@ -1094,23 +1184,33 @@
         async saveSettings() {
           this.settingsSaving = true;
           try {
-            // Save provider/url/model to server (no secrets)
-            const res = await fetch('/api/settings', {
+            const provider = this.settingsForm.ai_provider;
+
+            // Save this provider's url/model to DB
+            const res = await fetch('/api/settings/' + provider, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                ai_provider: this.settingsForm.ai_provider,
-                ai_base_url: this.settingsForm.ai_base_url || null,
-                ai_model: this.settingsForm.ai_model || null,
+                base_url: this.settingsForm.ai_base_url || null,
+                model: this.settingsForm.ai_model || null,
               }),
             });
             if (!res.ok) throw new Error('save failed');
-            // Save API key to localStorage only
+
+            // Save active provider + API key to localStorage
+            localStorage.setItem('tasker_active_provider', provider);
             if (this.settingsForm.ai_api_key.trim()) {
-              localStorage.setItem('tasker_ai_key', this.settingsForm.ai_api_key.trim());
+              localStorage.setItem('tasker_ai_key_' + provider, this.settingsForm.ai_api_key.trim());
             } else {
-              localStorage.removeItem('tasker_ai_key');
+              localStorage.removeItem('tasker_ai_key_' + provider);
             }
+
+            // Update local cache
+            this._providerConfigs[provider] = {
+              base_url: this.settingsForm.ai_base_url || null,
+              model: this.settingsForm.ai_model || null,
+            };
+
             this.showToast('Settings saved');
             this.showSettings = false;
           } catch (err) {
