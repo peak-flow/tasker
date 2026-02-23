@@ -121,7 +121,7 @@
         </template>
       </div>
 
-      <!-- Add project -->
+      <!-- Add project + Settings -->
       <div class="px-3 py-3 border-t border-border">
         <form @submit.prevent="createProject()" class="flex items-center gap-2">
           <input type="text" x-model="newProjectName" placeholder="New project..."
@@ -131,6 +131,10 @@
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
           </button>
         </form>
+        <button @click="openSettings()" class="mt-2 w-full flex items-center gap-2 px-3 py-1.5 text-xs text-muted hover:text-txt hover:bg-surface2 rounded-md transition-colors" title="AI Settings">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          AI Settings
+        </button>
       </div>
     </aside>
 
@@ -458,6 +462,60 @@
     </div>
   </div>
 
+  <!-- ==================== SETTINGS MODAL ==================== -->
+  <div x-show="showSettings" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" @keydown.escape.window="showSettings && closeSettings()">
+    <div class="bg-surface rounded-lg border border-border shadow-2xl w-[480px] max-w-[90vw] max-h-[80vh] flex flex-col" @click.outside="closeSettings()">
+      <div class="px-5 py-4 border-b border-border flex items-center justify-between">
+        <h3 class="text-sm font-medium text-txt">AI Settings</h3>
+        <button @click="closeSettings()" class="p-1 rounded hover:bg-surface2 text-muted hover:text-txt">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        <div>
+          <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-1.5">Provider</label>
+          <select x-model="settingsForm.ai_provider" class="w-full bg-surface2 text-txt text-sm px-3 py-2 rounded-md border border-border focus:border-accent focus:outline-none">
+            <option value="gemini">Google Gemini</option>
+            <option value="openai">OpenAI (or compatible: LM Studio, Ollama, Groq)</option>
+            <option value="anthropic">Anthropic Claude</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-1.5">API Base URL <span class="normal-case text-muted/60">(optional, for custom endpoints)</span></label>
+          <input type="text" x-model="settingsForm.ai_base_url"
+            :placeholder="settingsForm.ai_provider === 'openai' ? 'https://api.openai.com/v1 or http://localhost:1234/v1' : settingsForm.ai_provider === 'anthropic' ? 'https://api.anthropic.com' : 'https://generativelanguage.googleapis.com/v1beta'"
+            class="w-full bg-surface2 text-txt text-sm px-3 py-2 rounded-md border border-border focus:border-accent focus:outline-none placeholder-muted/40">
+          <p class="text-xs text-muted/60 mt-1">Leave blank to use the default endpoint for the selected provider.</p>
+        </div>
+        <div>
+          <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-1.5">Model <span class="normal-case text-muted/60">(optional)</span></label>
+          <input type="text" x-model="settingsForm.ai_model" placeholder="Leave blank for default"
+            class="w-full bg-surface2 text-txt text-sm px-3 py-2 rounded-md border border-border focus:border-accent focus:outline-none placeholder-muted/40">
+          <p class="text-xs text-muted/60 mt-1">
+            <span x-show="settingsForm.ai_provider === 'gemini'">Default: gemini-2.0-flash</span>
+            <span x-show="settingsForm.ai_provider === 'openai'">Default: gpt-4o-mini</span>
+            <span x-show="settingsForm.ai_provider === 'anthropic'">Default: claude-sonnet-4-20250514</span>
+          </p>
+        </div>
+        <div>
+          <label class="text-xs uppercase tracking-wider text-muted font-medium block mb-1.5">API Key</label>
+          <input type="password" x-model="settingsForm.ai_api_key"
+            placeholder="Enter API key"
+            class="w-full bg-surface2 text-txt text-sm px-3 py-2 rounded-md border border-border focus:border-accent focus:outline-none placeholder-muted/40">
+          <p class="text-xs text-muted/60 mt-1">Stored in your browser only. Never saved on the server.</p>
+        </div>
+      </div>
+      <div class="px-5 py-3 border-t border-border flex justify-end gap-2">
+        <button @click="closeSettings()" class="px-4 py-2 text-sm text-muted hover:text-txt hover:bg-surface2 rounded-md transition-colors">Cancel</button>
+        <button @click="saveSettings()" :disabled="settingsSaving"
+          class="px-4 py-2 text-sm bg-accent text-white rounded-md hover:bg-accent/80 disabled:opacity-50 transition-colors">
+          <span x-show="!settingsSaving">Save</span>
+          <span x-show="settingsSaving">Saving...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script>
     function app() {
       return {
@@ -474,6 +532,11 @@
         loadingTasks: false,
         addingChildToId: null,
         toast: { show: false, message: '', type: 'info' },
+
+        // Settings state
+        showSettings: false,
+        settingsForm: { ai_provider: 'gemini', ai_base_url: '', ai_model: '', ai_api_key: '' },
+        settingsSaving: false,
 
         // Blocker state
         blockerTaskId: null,
@@ -822,10 +885,10 @@
           this.loadingTaskId = item.id;
           try {
             const context = this._getTaskContext(item);
-            const res = await fetch('/api/gemini/breakdown', {
+            const res = await fetch('/api/ai/breakdown', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ task_label: item.label, context: context || undefined }),
+              body: JSON.stringify({ task_label: item.label, context: context || undefined, api_key: localStorage.getItem('tasker_ai_key') || undefined }),
             });
             if (!res.ok) {
               const errData = await res.json().catch(() => ({}));
@@ -1010,6 +1073,55 @@
             console.error('importData:', err);
             this.showToast(err.message || 'Failed to import', 'error');
           }
+        },
+
+        // ---- Settings ----
+        async openSettings() {
+          this.showSettings = true;
+          try {
+            const res = await fetch('/api/settings');
+            if (!res.ok) throw new Error('fetch failed');
+            const data = await res.json();
+            this.settingsForm.ai_provider = data.ai_provider || 'gemini';
+            this.settingsForm.ai_base_url = data.ai_base_url || '';
+            this.settingsForm.ai_model = data.ai_model || '';
+            this.settingsForm.ai_api_key = localStorage.getItem('tasker_ai_key') || '';
+          } catch (err) {
+            this.showToast('Failed to load settings', 'error');
+          }
+        },
+
+        async saveSettings() {
+          this.settingsSaving = true;
+          try {
+            // Save provider/url/model to server (no secrets)
+            const res = await fetch('/api/settings', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                ai_provider: this.settingsForm.ai_provider,
+                ai_base_url: this.settingsForm.ai_base_url || null,
+                ai_model: this.settingsForm.ai_model || null,
+              }),
+            });
+            if (!res.ok) throw new Error('save failed');
+            // Save API key to localStorage only
+            if (this.settingsForm.ai_api_key.trim()) {
+              localStorage.setItem('tasker_ai_key', this.settingsForm.ai_api_key.trim());
+            } else {
+              localStorage.removeItem('tasker_ai_key');
+            }
+            this.showToast('Settings saved');
+            this.showSettings = false;
+          } catch (err) {
+            this.showToast('Failed to save settings', 'error');
+          } finally {
+            this.settingsSaving = false;
+          }
+        },
+
+        closeSettings() {
+          this.showSettings = false;
         },
       };
     }

@@ -27,8 +27,11 @@ app.use('/api', taskRoutes);
 const blockerRoutes = require('./routes/blockers');
 app.use('/api/tasks', blockerRoutes);
 
-const geminiRoutes = require('./routes/gemini');
-app.use('/api/gemini', geminiRoutes);
+const aiRoutes = require('./routes/ai');
+app.use('/api/ai', aiRoutes);
+
+const settingsRoutes = require('./routes/settings');
+app.use('/api/settings', settingsRoutes);
 
 const exportRoutes = require('./routes/export');
 app.use('/api/export', exportRoutes);
