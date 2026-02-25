@@ -20,10 +20,11 @@ router.post('/', async (req, res) => {
   try {
     const { name, description, color, ai_context } = req.body;
     if (!name) return res.status(400).json({ error: 'Name is required' });
+    const normalizedContext = ai_context && ai_context.trim() !== '' ? ai_context.trim() : null;
 
     const { rows } = await pool.query(
       'INSERT INTO projects (name, description, color, ai_context) VALUES ($1, $2, $3, $4) RETURNING *',
-      [name, description || null, color || '#6c8cff', ai_context || null]
+      [name, description || null, color || '#6c8cff', normalizedContext]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -37,6 +38,8 @@ router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description, color, ai_context } = req.body;
+    const shouldUpdateContext = ai_context !== undefined;
+    const normalizedContext = shouldUpdateContext && ai_context && ai_context.trim() !== '' ? ai_context.trim() : null;
     const { rows } = await pool.query(
       `UPDATE projects SET
         name = COALESCE($1, name),
@@ -45,7 +48,7 @@ router.put('/:id', async (req, res) => {
         ai_context = CASE WHEN $4::boolean THEN $5 ELSE ai_context END,
         updated_at = NOW()
       WHERE id = $6 RETURNING *`,
-      [name, description, color, ai_context !== undefined, ai_context !== undefined ? (ai_context || null) : null, id]
+      [name, description, color, shouldUpdateContext, normalizedContext, id]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'Project not found' });
     res.json(rows[0]);

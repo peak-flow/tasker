@@ -182,6 +182,7 @@
                 <textarea
                   class="w-full bg-surface2/50 text-txt text-[11px] px-2.5 py-2 rounded-md border border-border/50 focus:border-accent focus:outline-none resize-none leading-relaxed"
                   rows="3"
+                  maxlength="2000"
                   placeholder="e.g. Laravel 10 app, uses Tailwind, MySQL, REST API with Sanctum auth..."
                   :value="selectedProject.ai_context || ''"
                   @blur="if ($el.value !== (selectedProject.ai_context || '')) { updateProject(selectedProject.id, { ai_context: $el.value }); }"

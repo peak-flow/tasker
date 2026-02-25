@@ -352,6 +352,12 @@ router.post('/breakdown', async (req, res) => {
   try {
     const { task_label, context, project_ai_context, api_key, provider: reqProvider, enable_logging } = req.body;
     if (!task_label) return res.status(400).json({ error: 'task_label is required' });
+    if (project_ai_context !== undefined && typeof project_ai_context !== 'string') {
+      return res.status(400).json({ error: 'project_ai_context must be a string' });
+    }
+    if (typeof project_ai_context === 'string' && project_ai_context.length > 2000) {
+      return res.status(400).json({ error: 'project_ai_context exceeds 2000 characters' });
+    }
 
     const provider = reqProvider || 'gemini';
     const callFn = PROVIDERS[provider];
@@ -369,7 +375,8 @@ router.post('/breakdown', async (req, res) => {
 
     // Build prompt with project context
     const contextStr = context ? `\nParent context: "${context}"` : '';
-    const projectStr = project_ai_context ? `\nProject context: ${project_ai_context}` : '';
+    const trimmedProjectContext = typeof project_ai_context === 'string' ? project_ai_context.trim() : '';
+    const projectStr = trimmedProjectContext ? `\nProject context: ${trimmedProjectContext}` : '';
     const prompt = `Given a task: "${task_label}"${contextStr}${projectStr}
 
 Break this task into 3-7 specific, actionable subtasks.
