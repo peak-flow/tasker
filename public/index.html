@@ -169,6 +169,32 @@
       <!-- Task Tree Area -->
       <div class="flex-1 overflow-y-auto">
 
+        <!-- Project AI Context (collapsible) -->
+        <template x-if="selectedProject">
+          <div class="px-4 pt-2">
+            <details class="group/ctx">
+              <summary class="flex items-center gap-1.5 cursor-pointer text-[11px] text-muted/60 hover:text-muted transition-colors select-none">
+                <svg class="w-3 h-3 transition-transform group-open/ctx:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                <span>AI Context</span>
+                <span x-show="selectedProject.ai_context" class="w-1.5 h-1.5 rounded-full bg-accent/60"></span>
+              </summary>
+              <div class="mt-1.5 mb-1">
+                <textarea
+                  class="w-full bg-surface2/50 text-txt text-[11px] px-2.5 py-2 rounded-md border border-border/50 focus:border-accent focus:outline-none resize-none leading-relaxed"
+                  rows="3"
+                  maxlength="2000"
+                  placeholder="e.g. Laravel 10 app, uses Tailwind, MySQL, REST API with Sanctum auth..."
+                  :value="selectedProject.ai_context || ''"
+                  @blur="if ($el.value !== (selectedProject.ai_context || '')) { updateProject(selectedProject.id, { ai_context: $el.value }); }"
+                  @keydown.ctrl.enter="$el.blur()"
+                  @keydown.meta.enter="$el.blur()"
+                ></textarea>
+                <p class="text-[10px] text-muted/30 mt-0.5">This context is sent to the AI when breaking down tasks. Ctrl+Enter to save.</p>
+              </div>
+            </details>
+          </div>
+        </template>
+
         <!-- Active project with tasks loaded -->
         <template x-if="selectedProjectId && !loadingTasks">
           <div class="px-4 py-3">
@@ -1257,6 +1283,7 @@
               body: JSON.stringify({
                 task_label: item.label,
                 context: context || undefined,
+                project_ai_context: this.selectedProject?.ai_context || undefined,
                 provider: localStorage.getItem('tasker_active_provider') || 'gemini',
                 api_key: localStorage.getItem('tasker_ai_key_' + (localStorage.getItem('tasker_active_provider') || 'gemini')) || undefined,
                 enable_logging: localStorage.getItem('tasker_ai_logging') === 'true',
