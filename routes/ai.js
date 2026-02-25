@@ -350,7 +350,7 @@ router.post('/models', async (req, res) => {
 
 router.post('/breakdown', async (req, res) => {
   try {
-    const { task_label, context, api_key, provider: reqProvider, enable_logging } = req.body;
+    const { task_label, context, project_ai_context, api_key, provider: reqProvider, enable_logging } = req.body;
     if (!task_label) return res.status(400).json({ error: 'task_label is required' });
 
     const provider = reqProvider || 'gemini';
@@ -367,13 +367,15 @@ router.post('/breakdown', async (req, res) => {
       return res.status(400).json({ error: 'No API key configured. Add one in Settings.' });
     }
 
-    // Build prompt (same as original)
+    // Build prompt with project context
     const contextStr = context ? `\nParent context: "${context}"` : '';
-    const prompt = `Given a task: "${task_label}"${contextStr}
+    const projectStr = project_ai_context ? `\nProject context: ${project_ai_context}` : '';
+    const prompt = `Given a task: "${task_label}"${contextStr}${projectStr}
 
 Break this task into 3-7 specific, actionable subtasks.
 Return ONLY a JSON array of strings, nothing else.
 Keep subtasks concrete and small enough to complete in one sitting.
+Tailor subtasks to the project's technology stack and conventions when project context is provided.
 Example: ["Set up project structure", "Create database schema", "Build API endpoints"]`;
 
     const callArgs = { prompt, apiKey, baseUrl: config.base_url, model: config.model };
